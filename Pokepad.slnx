@@ -1,1 +1,10 @@
-<Solution />
+<Solution>
+  <Folder Name="/CDK/">
+    <Project Path="CDK/Pokepad.Infra.Tests/Pokepad.Infra.Tests.csproj" />
+    <Project Path="CDK/Pokepad.Infra/Pokepad.Infra.csproj" />
+  </Folder>
+  <Folder Name="/Project Files/">
+    <File Path=".gitignore" />
+    <File Path="README.md" />
+  </Folder>
+</Solution>

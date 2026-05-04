@@ -1,0 +1,138 @@
+{
+  "version": "39.0.0",
+  "artifacts": {
+    "PokepadDataLake.assets": {
+      "type": "cdk:asset-manifest",
+      "properties": {
+        "file": "PokepadDataLake.assets.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+      }
+    },
+    "PokepadDataLake": {
+      "type": "aws:cloudformation:stack",
+      "environment": "aws://unknown-account/unknown-region",
+      "properties": {
+        "templateFile": "PokepadDataLake.template.json",
+        "terminationProtection": false,
+        "tags": {
+          "environment": "dev",
+          "project": "pokepad"
+        },
+        "validateOnSynth": false,
+        "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-deploy-role-${AWS::AccountId}-${AWS::Region}",
+        "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-cfn-exec-role-${AWS::AccountId}-${AWS::Region}",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}/c233bcb3a0c06fb5720a2b9df0f5a8af03f97ebe086f77551064783d14d966d5.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
+        "additionalDependencies": [
+          "PokepadDataLake.assets"
+        ],
+        "lookupRole": {
+          "arn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-lookup-role-${AWS::AccountId}-${AWS::Region}",
+          "requiresBootstrapStackVersion": 8,
+          "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+        }
+      },
+      "dependencies": [
+        "PokepadDataLake.assets"
+      ],
+      "metadata": {
+        "/PokepadDataLake": [
+          {
+            "type": "aws:cdk:stack-tags",
+            "data": [
+              {
+                "Key": "environment",
+                "Value": "dev"
+              },
+              {
+                "Key": "project",
+                "Value": "pokepad"
+              }
+            ]
+          }
+        ],
+        "/PokepadDataLake/bronze-bucket/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "bronzebucket57AE9AE6"
+          }
+        ],
+        "/PokepadDataLake/bronze-bucket/Policy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "bronzebucketPolicy4B406EB8"
+          }
+        ],
+        "/PokepadDataLake/silver-bucket/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "silverbucketF4FFAC7C"
+          }
+        ],
+        "/PokepadDataLake/silver-bucket/Policy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "silverbucketPolicyF322B11F"
+          }
+        ],
+        "/PokepadDataLake/gold-bucket/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "goldbucket3AA5B55D"
+          }
+        ],
+        "/PokepadDataLake/gold-bucket/Policy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "goldbucketPolicyB0C8BA7B"
+          }
+        ],
+        "/PokepadDataLake/athena-results-bucket/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "athenaresultsbucketF3564413"
+          }
+        ],
+        "/PokepadDataLake/athena-results-bucket/Policy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "athenaresultsbucketPolicy91E1621B"
+          }
+        ],
+        "/PokepadDataLake/CDKMetadata/Default": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CDKMetadata"
+          }
+        ],
+        "/PokepadDataLake/CDKMetadata/Condition": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CDKMetadataAvailable"
+          }
+        ],
+        "/PokepadDataLake/BootstrapVersion": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "BootstrapVersion"
+          }
+        ],
+        "/PokepadDataLake/CheckBootstrapVersion": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CheckBootstrapVersion"
+          }
+        ]
+      },
+      "displayName": "PokepadDataLake"
+    },
+    "Tree": {
+      "type": "cdk:tree",
+      "properties": {
+        "file": "tree.json"
+      }
+    }
+  }
+}
