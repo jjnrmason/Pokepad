@@ -3,8 +3,14 @@
     <Project Path="CDK/Pokepad.Infra.Tests/Pokepad.Infra.Tests.csproj" />
     <Project Path="CDK/Pokepad.Infra/Pokepad.Infra.csproj" />
   </Folder>
+  <Folder Name="/Data Generation/">
+    <Project Path="Data Generation/Pokepad.DataGeneration/Pokepad.DataGeneration.csproj" />
+  </Folder>
   <Folder Name="/Project Files/">
     <File Path=".gitignore" />
     <File Path="README.md" />
+  </Folder>
+  <Folder Name="/Shared Libraries/">
+    <Project Path="Shared Libraries/Pokepad.Models/Pokepad.Models.csproj" />
   </Folder>
 </Solution>

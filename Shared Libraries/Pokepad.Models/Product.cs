@@ -1,0 +1,10 @@
+namespace Pokepad.Models;
+
+public record Product(
+    string ProductId,
+    string Name,
+    string Category,
+    string Description,
+    decimal Price,
+    int StockQuantity
+);
