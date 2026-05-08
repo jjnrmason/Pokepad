@@ -13,14 +13,14 @@ public static class S3Uploader
         foreach (var directory in Directory.GetDirectories(outputDirectory))
         {
             var entityName = Path.GetFileName(directory);
-            var csvPath = Path.Combine(directory, $"{entityName}.csv");
+            var csvPath = Path.Combine(directory, $"{entityName}.parquet");
 
             if (!File.Exists(csvPath))
             {
                 continue;
             }
 
-            var s3Key = $"gold/{entityName}/{entityName}.csv";
+            var s3Key = $"gold/{entityName}/{entityName}.parquet";
             await transferUtility.UploadAsync(csvPath, bucketName, s3Key);
             Console.WriteLine($"  Uploaded: s3://{bucketName}/{s3Key}");
         }

@@ -1,5 +1,5 @@
 {
-  "app": "dotnet run --project src/Pokepad.Infra/Pokepad.Infra.csproj",
+  "app": "dotnet run --project Pokepad.Infra/Pokepad.Infra.csproj",
   "watch": {
     "include": [
       "**"

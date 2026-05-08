@@ -1,8 +1,6 @@
 using System.CommandLine;
-using CsvHelper;
-using CsvHelper.Configuration;
+using Parquet.Serialization;
 using Pokepad.DataGeneration.Generators;
-using System.Globalization;
 
 Option<string?> bucketOption = new("--gold-bucket-name")
 {
@@ -32,14 +30,14 @@ Option<int> ordersOption = new("--orders")
     DefaultValueFactory = result => result.Tokens.Count == 0 ? 2000 : int.Parse(result.Tokens.Single().Value)
 };
 
-RootCommand rootCommand = new("Generate dummy PokepadData in gold layer.");
+RootCommand rootCommand = new("Generate dummy Pokepad data in gold layer.");
 rootCommand.Options.Add(bucketOption);
 rootCommand.Options.Add(customersOption);
 rootCommand.Options.Add(productsOption);
 rootCommand.Options.Add(ordersOption);
 
 var parseResult = rootCommand.Parse(args);
-if (parseResult.Errors.Count == 0 && 
+if (parseResult.Errors.Count == 0 &&
     parseResult.GetValue(bucketOption) is var parsedBucketName &&
     parseResult.GetValue(customersOption) is var parsedCustomerCount &&
     parseResult.GetValue(productsOption) is var parsedProductCount &&
@@ -49,7 +47,8 @@ if (parseResult.Errors.Count == 0 &&
     return 0;
 }
 
-foreach (var parseError in parseResult.Errors) {
+foreach (var parseError in parseResult.Errors)
+{
     Console.Error.WriteLine(parseError.Message);
 }
 return 1;
@@ -66,13 +65,13 @@ async Task GenerateData(string? bucketName, int customerCount, int productCount,
     Console.WriteLine($"Generated {orderItems.Count} order items across {orders.Count} orders.");
     Console.WriteLine();
 
-    WriteCsv(customers, Path.Combine(outputDirectory, "customers", "customers.csv"));
-    WriteCsv(products, Path.Combine(outputDirectory, "products", "products.csv"));
-    WriteCsv(orders, Path.Combine(outputDirectory, "orders", "orders.csv"));
-    WriteCsv(orderItems, Path.Combine(outputDirectory, "order_items", "order_items.csv"));
+    await WriteParquet(customers, Path.Combine(outputDirectory, "customers", "customers.parquet"));
+    await WriteParquet(products, Path.Combine(outputDirectory, "products", "products.parquet"));
+    await WriteParquet(orders, Path.Combine(outputDirectory, "orders", "orders.parquet"));
+    await WriteParquet(orderItems, Path.Combine(outputDirectory, "order_items", "order_items.parquet"));
 
     Console.WriteLine();
-    Console.WriteLine("CSV files written to ./output/");
+    Console.WriteLine("Parquet files written to ./output/");
 
     if (!string.IsNullOrWhiteSpace(bucketName))
     {
@@ -89,12 +88,11 @@ async Task GenerateData(string? bucketName, int customerCount, int productCount,
 
     return;
 
-    static void WriteCsv<T>(IEnumerable<T> records, string filePath)
+    static async Task WriteParquet<T>(IEnumerable<T> records, string filePath)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
-        using var writer = new StreamWriter(filePath);
-        using var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture));
-        csv.WriteRecords(records);
+        await using var stream = File.Create(filePath);
+        await ParquetSerializer.SerializeAsync(records, stream);
         Console.WriteLine($" Written: {filePath}");
     }
 }
