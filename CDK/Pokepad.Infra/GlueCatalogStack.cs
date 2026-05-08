@@ -7,6 +7,8 @@ namespace Pokepad.Infra;
 
 public sealed class GlueCatalogStack : Stack
 {
+    public string DatabaseName { get; } = "ecommerce_gold";
+
     public GlueCatalogStack(Construct scope, string id, Bucket goldBucket, IStackProps? props = null) : base(scope, id, props)
     {
         var database = new CfnDatabase(this, "ecommerce-gold-database", new CfnDatabaseProps
