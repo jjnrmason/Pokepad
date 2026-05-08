@@ -5,6 +5,6 @@ public record Product(
     string Name,
     string Category,
     string Description,
-    decimal Price,
+    double Price,
     int StockQuantity
 );

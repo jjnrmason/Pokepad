@@ -13,7 +13,7 @@ public sealed class DataLakeStack : Stack
         Bronze = CreateMedallionBucket("bronze", env);
         Silver = CreateMedallionBucket("silver", env);
         Gold = CreateMedallionBucket("gold", env);
-        AthenaResults = CreateMedallionBucket("athena-results", env);
+        AthenaResults = CreateMedallionBucket("athena-results", env, queryResultRetentionDays: 7);
     }
 
     public Bucket Bronze { get; }
@@ -21,8 +21,20 @@ public sealed class DataLakeStack : Stack
     public Bucket Gold { get; }
     public Bucket AthenaResults { get; }
 
-    private Bucket CreateMedallionBucket(string tier, string env)
+    private Bucket CreateMedallionBucket(string tier, string env, int? queryResultRetentionDays = null)
     {
+        var lifecycleRules = queryResultRetentionDays is { } days
+            ? new LifecycleRule[]
+            {
+                new()
+                {
+                    Id = "expire-query-results",
+                    Enabled = true,
+                    Expiration = Duration.Days(days)
+                }
+            }
+            : null;
+
         return new Bucket(this, $"{tier}-bucket", new BucketProps
         {
             BucketName = $"pokepad-{tier}-{env}-{Account}-{Region}",
@@ -32,6 +44,7 @@ public sealed class DataLakeStack : Stack
             EnforceSSL = true,
             RemovalPolicy = RemovalPolicy.RETAIN,
             AutoDeleteObjects = false,
+            LifecycleRules = lifecycleRules
         });
     }
 }

@@ -48,7 +48,7 @@ public class ECommerceDataGenerator
             _faker.Commerce.ProductName(),
             _faker.PickRandom(ProductCategories),
             _faker.Commerce.ProductDescription(),
-            _faker.Finance.Amount(1, 999, 2),
+            Math.Round(_faker.Random.Double(1, 999), 2),
             _faker.Random.Int(0, 500)
         )).ToList();
 
@@ -61,7 +61,7 @@ public class ECommerceDataGenerator
                 customer.CustomerId,
                 _faker.Date.Past(2),
                 _faker.PickRandom(OrderStatuses),
-                _faker.Finance.Amount(5, 2000, 2),
+                Math.Round(_faker.Random.Double(5, 2000), 2),
                 $"{_faker.Address.StreetAddress()}, {_faker.Address.City()}, {_faker.Address.Country()}"
             );
         }).ToList();

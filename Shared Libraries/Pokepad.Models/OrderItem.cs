@@ -5,6 +5,6 @@ public record OrderItem(
     string OrderId,
     string ProductId,
     int Quantity,
-    decimal UnitPrice,
-    decimal Subtotal
+    double UnitPrice,
+    double Subtotal
 );

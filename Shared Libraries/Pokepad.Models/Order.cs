@@ -5,6 +5,6 @@ public record Order(
     string CustomerId,
     DateTime OrderDate,
     string Status,
-    decimal TotalAmount,
+    double TotalAmount,
     string ShippingAddress
 );
