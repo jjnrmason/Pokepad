@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh issue *)",
+      "Bash(dotnet build *)",
+      "Bash(dotnet test *)"
+    ],
+    "deny": [
+      "Read(*.Development.json)",
+      "Read(launchSettings.json)"
+    ]
+  }
+}

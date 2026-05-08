@@ -11,8 +11,10 @@
 *.sln.docstates
 *.env
 .idea/
-.claude/
+.claude/settings.local.json
 .DS_Store
+*.Development.json
+launchSettings.json
 
 # CDK Files
 cdk.out/

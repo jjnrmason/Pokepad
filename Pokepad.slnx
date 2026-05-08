@@ -6,7 +6,11 @@
   <Folder Name="/Data Generation/">
     <Project Path="Data Generation/Pokepad.DataGeneration/Pokepad.DataGeneration.csproj" />
   </Folder>
+  <Folder Name="/Lambda/">
+    <Project Path="Lambda/Pokepad.Lambda/Pokepad.Lambda.csproj" />
+  </Folder>
   <Folder Name="/Project Files/">
+    <File Path=".claude\settings.json" />
     <File Path=".gitignore" />
     <File Path="README.md" />
   </Folder>
