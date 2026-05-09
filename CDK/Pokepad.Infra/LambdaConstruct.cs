@@ -1,6 +1,7 @@
 using Amazon.CDK;
 using Amazon.CDK.AWS.Apigatewayv2;
 using Amazon.CDK.AWS.CloudWatch;
+using Amazon.CDK.AWS.EC2;
 using Amazon.CDK.AWS.IAM;
 using Amazon.CDK.AWS.Lambda;
 using Amazon.CDK.AWS.Logs;
@@ -19,11 +20,12 @@ public sealed class LambdaConstruct : Construct
         DataLakeConstruct dataLake,
         GlueCatalogConstruct glueCatalog,
         CognitoConstruct cognito,
-        DynamoConstruct dynamo)
+        DynamoConstruct dynamo,
+        VectorStoreConstruct vectorStore)
         : base(scope, id)
     {
-        var role = CreateLambdaRole(dataLake, glueCatalog, dynamo);
-        var function = CreateLambdaFunction(role, dataLake, dynamo);
+        var role = CreateLambdaRole(dataLake, glueCatalog, dynamo, vectorStore);
+        var function = CreateLambdaFunction(role, dataLake, dynamo, vectorStore);
         CreateErrorRateAlarm(function);
         var api = CreateHttpApi(function, cognito);
 
@@ -34,7 +36,7 @@ public sealed class LambdaConstruct : Construct
         });
     }
 
-    private Role CreateLambdaRole(DataLakeConstruct dataLake, GlueCatalogConstruct glueCatalog, DynamoConstruct dynamo)
+    private Role CreateLambdaRole(DataLakeConstruct dataLake, GlueCatalogConstruct glueCatalog, DynamoConstruct dynamo, VectorStoreConstruct vectorStore)
     {
         var stack = Stack.Of(this);
 
@@ -44,7 +46,7 @@ public sealed class LambdaConstruct : Construct
             AssumedBy = new ServicePrincipal("lambda.amazonaws.com"),
             ManagedPolicies =
             [
-                ManagedPolicy.FromAwsManagedPolicyName("service-role/AWSLambdaBasicExecutionRole")
+                ManagedPolicy.FromAwsManagedPolicyName("service-role/AWSLambdaVPCAccessExecutionRole")
             ]
         });
 
@@ -131,10 +133,24 @@ public sealed class LambdaConstruct : Construct
             Resources = [ssmParamArn]
         }));
 
+        var vectorDbParamArn = Arn.Format(new ArnComponents
+        {
+            Service = "ssm",
+            Resource = "parameter",
+            ResourceName = "pokepad/vector-db-connection-string"
+        }, stack);
+
+        role.AddToPolicy(new PolicyStatement(new PolicyStatementProps
+        {
+            Effect = Effect.ALLOW,
+            Actions = ["ssm:GetParameter"],
+            Resources = [vectorDbParamArn]
+        }));
+
         return role;
     }
 
-    private Function CreateLambdaFunction(Role role, DataLakeConstruct dataLake, DynamoConstruct dynamo)
+    private Function CreateLambdaFunction(Role role, DataLakeConstruct dataLake, DynamoConstruct dynamo, VectorStoreConstruct vectorStore)
     {
         var athenaOutputLocation = $"s3://{dataLake.AthenaResults.BucketName}/results/";
 
@@ -179,13 +195,17 @@ public sealed class LambdaConstruct : Construct
             Architecture = Architecture.X86_64,
             LogGroup = logGroup,
             Tracing = Tracing.ACTIVE,
+            Vpc = vectorStore.Vpc,
+            VpcSubnets = new SubnetSelection { SubnetType = SubnetType.PRIVATE_ISOLATED },
+            SecurityGroups = [vectorStore.LambdaSecurityGroup],
             Environment = new Dictionary<string, string>
             {
                 { "ASPNETCORE_ENVIRONMENT", "Production" },
                 { "ATHENA_OUTPUT_LOCATION", athenaOutputLocation },
                 { "AI_API_KEY_PARAM", "/pokepad/ai-api-key" },
                 { "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "1" },
-                { "DYNAMODB_TABLE_NAME", dynamo.Table.TableName }
+                { "DYNAMODB_TABLE_NAME", dynamo.Table.TableName },
+                { "VECTOR_DB_CONNECTION_STRING_PARAM", "/pokepad/vector-db-connection-string" }
             }
         });
     }
