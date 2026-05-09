@@ -4,7 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 
-namespace Pokepad.Lambda;
+namespace Pokepad.Lambda.Middleware;
 
 // API Gateway validates the JWT before forwarding to Lambda, so we only need to
 // decode the payload to populate HttpContext.User — no signature verification needed.

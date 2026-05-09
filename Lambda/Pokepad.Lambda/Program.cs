@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Scalar.AspNetCore;
 using Amazon.Athena;
@@ -8,7 +7,9 @@ using Amazon.SimpleSystemsManagement;
 using Amazon.SimpleSystemsManagement.Model;
 using OpenAI;
 using Pokepad.Lambda;
-using Pokepad.Lambda.Models;
+using Pokepad.Lambda.Endpoints.V1;
+using Pokepad.Lambda.Exceptions;
+using Pokepad.Lambda.Middleware;
 using Pokepad.Lambda.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -118,139 +119,31 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+app.UseExceptionHandler(exceptionHandlerApp => exceptionHandlerApp.Run(async ctx =>
+{
+    var ex = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
+    if (ex is InputValidationException)
+    {
+        ctx.Response.StatusCode = 400;
+        await ctx.Response.WriteAsJsonAsync(new { error = ex.Message });
+    }
+    else
+    {
+        ctx.Response.StatusCode = 500;
+        await ctx.Response.WriteAsJsonAsync(new { error = "Something went wrong. Try again." });
+    }
+}));
+
 app.MapOpenApi();
 app.MapScalarApiReference();
 
 var v1 = app.MapGroup("/v1");
 
-v1.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
-    .WithName("Health")
-    .WithSummary("Health check")
-    .WithDescription("Returns 200 OK when the service is running. No authentication required.")
-    .WithTags("Health");
-
-v1.MapPost("/search", async (
-    SearchRequest request,
-    GlueSchemaService glue,
-    OpenAiService openAi,
-    AthenaService athena,
-    SqlValidator validator) =>
-{
-    var schema = await glue.GetSchemaAsync();
-    var sql = await openAi.GenerateSqlAsync(request.Question, schema);
-
-    validator.Validate(sql);
-
-    var results = await athena.ExecuteAsync(sql);
-    return Results.Ok(new SearchResponse(sql, results.Columns, results.Rows));
-})
-    .WithName("Search")
-    .WithSummary("Synchronous natural language search")
-    .WithDescription("Translates a natural-language question into SQL via OpenAI, executes it against Athena, and returns the results. Blocks until the query completes (up to the 30 s Lambda timeout).")
-    .WithTags("Search")
-    .Produces<SearchResponse>()
-    .RequireAuthorization();
-
-v1.MapPost("/query/start", async (
-    HttpContext ctx,
-    SearchRequest request,
-    GlueSchemaService glue,
-    OpenAiService openAi,
-    AthenaService athena,
-    SqlValidator validator,
-    QueryTrackingService tracking) =>
-{
-    var userId = GetUserId(ctx);
-
-    var schema = await glue.GetSchemaAsync();
-    var sql = await openAi.GenerateSqlAsync(request.Question, schema);
-    validator.Validate(sql);
-
-    var executionId = await athena.StartAsync(sql);
-    await tracking.TrackAsync(executionId, userId);
-
-    return Results.Accepted($"/v1/query/{executionId}/status", new { executionId });
-})
-    .WithName("StartQuery")
-    .WithSummary("Start an asynchronous query")
-    .WithDescription("Starts an Athena query and returns immediately with an executionId. Poll /v1/query/{id}/status until SUCCEEDED, then fetch results from /v1/query/{id}/results.")
-    .WithTags("Async Query")
-    .RequireAuthorization();
-
-v1.MapGet("/query/{id}/status", async (
-    HttpContext ctx,
-    string id,
-    AthenaService athena,
-    QueryTrackingService tracking) =>
-{
-    var userId = GetUserId(ctx);
-
-    var owner = await tracking.GetOwnerAsync(id);
-    if (owner is null) return Results.NotFound();
-    if (owner != userId) return Results.Forbid();
-
-    var execution = await athena.GetExecutionAsync(id);
-    return Results.Ok(new { executionId = id, status = execution.Status.State.Value });
-})
-    .WithName("GetQueryStatus")
-    .WithSummary("Poll query status")
-    .WithDescription("Returns the current Athena execution state (QUEUED, RUNNING, SUCCEEDED, FAILED, CANCELLED). Returns 404 if unknown/expired, 403 if not the query owner.")
-    .WithTags("Async Query")
-    .RequireAuthorization();
-
-v1.MapGet("/query/{id}/results", async (
-    HttpContext ctx,
-    string id,
-    AthenaService athena,
-    QueryTrackingService tracking) =>
-{
-    var userId = GetUserId(ctx);
-
-    var owner = await tracking.GetOwnerAsync(id);
-    if (owner is null) return Results.NotFound();
-    if (owner != userId) return Results.Forbid();
-
-    var execution = await athena.GetExecutionAsync(id);
-    if (execution.Status.State != QueryExecutionState.SUCCEEDED)
-        return Results.Conflict(new { executionId = id, status = execution.Status.State.Value });
-
-    var results = await athena.FetchResultsAsync(id);
-    return Results.Ok(new SearchResponse(execution.Query, results.Columns, results.Rows));
-})
-    .WithName("GetQueryResults")
-    .WithSummary("Fetch results for a completed query")
-    .WithDescription("Returns query results once status is SUCCEEDED. Returns 409 Conflict with the current status if the query is still running.")
-    .WithTags("Async Query")
-    .Produces<SearchResponse>()
-    .RequireAuthorization();
+v1.MapHealthEndpoints();
+v1.MapSearchEndpoints();
+v1.MapQueryEndpoints();
 
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.Run();
-
-// API Gateway validates the JWT before forwarding to Lambda, so decoding without
-// re-validating the signature here is safe and avoids an outbound JWKS fetch.
-// The alternative — AddJwtBearer — would on first cold-start request:
-//   1. Extract the kid from the JWT header
-//   2. GET https://cognito-idp.{region}.amazonaws.com/{poolId}/.well-known/jwks.json
-//   3. Verify the signature against the matching public key
-//   4. Populate HttpContext.User.Claims
-// The JWKS is cached after that, but cold starts are already the expensive path.
-static string GetUserId(HttpContext ctx)
-{
-    var auth = ctx.Request.Headers.Authorization.ToString();
-    if (!auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-        return Results.Unauthorized().ToString()!; // unreachable past the authorizer
-
-    var parts = auth[7..].Split('.');
-    if (parts.Length < 2) throw new InvalidOperationException("Malformed JWT");
-
-    var payload = parts[1].Replace('-', '+').Replace('_', '/');
-    payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
-
-    using var doc = JsonDocument.Parse(Convert.FromBase64String(payload));
-    return doc.RootElement.TryGetProperty("sub", out var sub)
-        ? sub.GetString() ?? throw new InvalidOperationException("Empty sub claim")
-        : throw new InvalidOperationException("No sub claim in JWT");
-}

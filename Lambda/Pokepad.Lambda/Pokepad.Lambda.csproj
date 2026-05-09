@@ -19,4 +19,8 @@
       <PackageReference Include="Scalar.AspNetCore" Version="2.14.11" />
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\..\Shared Libraries\Pokepad.Data\Pokepad.Data.csproj" />
+    </ItemGroup>
+
 </Project>

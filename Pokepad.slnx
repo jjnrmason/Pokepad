@@ -17,6 +17,7 @@
     <File Path="README.md" />
   </Folder>
   <Folder Name="/Shared Libraries/">
+    <Project Path="Shared Libraries/Pokepad.Data/Pokepad.Data.csproj" />
     <Project Path="Shared Libraries/Pokepad.Models/Pokepad.Models.csproj" />
   </Folder>
 </Solution>
