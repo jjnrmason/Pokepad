@@ -140,7 +140,6 @@ public sealed class LambdaConstruct : Construct
 
         var logGroup = new LogGroup(this, "lambda-logs", new LogGroupProps
         {
-            LogGroupName = "/aws/lambda/pokepad-search",
             Retention = RetentionDays.ONE_MONTH,
             RemovalPolicy = RemovalPolicy.DESTROY
         });
@@ -230,7 +229,6 @@ public sealed class LambdaConstruct : Construct
 
         var accessLogGroup = new LogGroup(this, "api-access-logs", new LogGroupProps
         {
-            LogGroupName = "/pokepad/api/access-logs",
             Retention = RetentionDays.ONE_MONTH,
             RemovalPolicy = RemovalPolicy.DESTROY
         });
