@@ -1,7 +1,7 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Authentication;
 using Scalar.AspNetCore;
 using Amazon.Athena;
-using Amazon.Athena.Model;
 using Amazon.DynamoDBv2;
 using Amazon.Glue;
 using Amazon.SimpleSystemsManagement;
@@ -108,6 +108,9 @@ builder.Services.AddSingleton<AthenaService>();
 builder.Services.AddSingleton<ClaudeService>();
 builder.Services.AddSingleton<SqlValidator>();
 builder.Services.AddSingleton<QueryTrackingService>();
+builder.Services.AddAuthentication("ApiGateway")
+    .AddScheme<AuthenticationSchemeOptions, ApiGatewayAuthHandler>("ApiGateway", _ => { });
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
@@ -216,6 +219,9 @@ v1.MapGet("/query/{id}/results", async (
     .WithTags("Async Query")
     .Produces<SearchResponse>()
     .RequireAuthorization();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.Run();
 
