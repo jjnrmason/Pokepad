@@ -1,6 +1,6 @@
 # Pokepad Lambda — Search API
 
-ASP.NET Core minimal API hosted on AWS Lambda via `Amazon.Lambda.AspNetCoreServer.Hosting`. Accepts natural language questions, converts them to SQL using Claude, executes them against Athena, and returns tabular results.
+ASP.NET Core minimal API hosted on AWS Lambda via `Amazon.Lambda.AspNetCoreServer.Hosting`. Accepts natural language questions, converts them to SQL using OpenAI, executes them against Athena, and returns tabular results.
 
 ## Endpoints
 
@@ -74,15 +74,15 @@ Returns `409 Conflict` with the current status if the query has not yet `SUCCEED
 
 ## Services
 
-### ClaudeService
+### OpenAiService
 
-Calls the Anthropic API to translate a natural language question into an Athena SQL `SELECT` statement. The Glue schema is injected into the system prompt and marked with `CacheControlEphemeral` so Anthropic caches it across requests — this reduces input token cost by ~90 % after the first call.
+Calls the OpenAI API to translate a natural language question into an Athena SQL `SELECT` statement. The Glue schema is injected into the system prompt.
 
-Uses `claude-sonnet-4-6`. Max tokens: 1024.
+Uses `gpt-4o`. Max tokens: 1024.
 
 ### GlueSchemaService
 
-Fetches table definitions from the Glue Data Catalog at query time and formats them as a schema string for the Claude prompt. The catalog has four tables: `customers`, `products`, `orders`, `order_items`.
+Fetches table definitions from the Glue Data Catalog at query time and formats them as a schema string for the OpenAI system prompt. The catalog has four tables: `customers`, `products`, `orders`, `order_items`.
 
 ### AthenaService
 
@@ -95,7 +95,7 @@ Runs before every Athena query. Verifies the generated SQL:
 1. Must start with `SELECT` (case-insensitive).
 2. Must not contain any of: `DROP`, `DELETE`, `INSERT`, `UPDATE`, `CREATE`, `ALTER`, `TRUNCATE`, `EXEC`, `EXECUTE`, `MERGE`, `--`, `/*`.
 
-This is a defence-in-depth guard — Claude is already instructed to write only `SELECT` queries, but the validator catches any prompt-injection or model misbehaviour before it reaches Athena.
+This is a defence-in-depth guard — the model is already instructed to write only `SELECT` queries, but the validator catches any prompt-injection or model misbehaviour before it reaches Athena.
 
 ### QueryTrackingService
 
@@ -112,9 +112,9 @@ This avoids an outbound JWKS fetch on every cold start. The trade-off is that La
 | Variable | Source | Description |
 |----------|--------|-------------|
 | `ASPNETCORE_ENVIRONMENT` | Lambda config | Set to `Production` in deployed Lambda |
-| `ANTHROPIC_API_KEY_PARAM` | Lambda config | SSM parameter path for the Anthropic key |
-| `ANTHROPIC_API_KEY` | Set at startup from SSM | Consumed by the Anthropic SDK |
+| `API_KEY_PARAM` | Lambda config | SSM parameter path for the OpenAI key |
+| `API_KEY` | Set at startup from SSM | Consumed by `OpenAiService` |
 | `ATHENA_OUTPUT_LOCATION` | Lambda config | S3 URI for Athena result output |
 | `DYNAMODB_TABLE_NAME` | Lambda config | DynamoDB table for query tracking |
 
-In `Development` mode the SSM fetch is skipped. Set `ANTHROPIC_API_KEY` directly in your shell instead.
+In `Development` mode the SSM fetch is skipped. Set `API_KEY` directly in your shell instead.

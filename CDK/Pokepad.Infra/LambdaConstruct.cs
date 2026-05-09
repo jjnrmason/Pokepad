@@ -121,7 +121,7 @@ public sealed class LambdaConstruct : Construct
         {
             Service = "ssm",
             Resource = "parameter",
-            ResourceName = "pokepad/anthropic-api-key"
+            ResourceName = "pokepad/ai-api-key"
         }, stack);
 
         role.AddToPolicy(new PolicyStatement(new PolicyStatementProps
@@ -183,7 +183,7 @@ public sealed class LambdaConstruct : Construct
             {
                 { "ASPNETCORE_ENVIRONMENT", "Production" },
                 { "ATHENA_OUTPUT_LOCATION", athenaOutputLocation },
-                { "ANTHROPIC_API_KEY_PARAM", "/pokepad/anthropic-api-key" },
+                { "AI_API_KEY_PARAM", "/pokepad/ai-api-key" },
                 { "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "1" },
                 { "DYNAMODB_TABLE_NAME", dynamo.Table.TableName }
             }

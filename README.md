@@ -1,6 +1,6 @@
 # Pokepad
 
-Pokepad is a natural language search API over e-commerce data. You ask a question in plain English; Claude translates it to SQL, Athena runs it against a data lake, and the results come back as structured JSON.
+Pokepad is a natural language search API over e-commerce data. You ask a question in plain English; OpenAI translates it to SQL, Athena runs it against a data lake, and the results come back as structured JSON.
 
 ## Architecture
 
@@ -12,7 +12,7 @@ API Gateway (HTTP API)   ← rate limited: 10 req/s burst
   │  JWT verified by Cognito authorizer
   ▼
 Lambda (ASP.NET Core, 512 MB, 30 s)
-  ├── ClaudeService  ────────► Anthropic API (SQL generation)
+  ├── OpenAiService  ────────► OpenAI API (SQL generation)
   ├── GlueSchemaService ─────► Glue Data Catalog (schema lookup)
   ├── AthenaService  ────────► Athena workgroup "pokepad"
   │                                   │
@@ -20,7 +20,7 @@ Lambda (ASP.NET Core, 512 MB, 30 s)
   │                            S3 Athena results bucket
   │
   ├── QueryTrackingService ──► DynamoDB (async query ownership, 24 h TTL)
-  └── SSM Parameter Store  ──► /pokepad/anthropic-api-key (encrypted)
+  └── SSM Parameter Store  ──► /pokepad/ai-api-key (encrypted)
 ```
 
 **Data lake — medallion layers**
@@ -57,9 +57,9 @@ See the README in each project for more detail.
 ```bash
 cd Lambda/Pokepad.Lambda
 
-# Set the Anthropic key directly when running in Development mode
+# Set the OpenAI key directly when running in Development mode
 # (SSM fetch is skipped when ASPNETCORE_ENVIRONMENT=Development)
-export ANTHROPIC_API_KEY=sk-ant-...
+export API_KEY=sk-...
 export ATHENA_OUTPUT_LOCATION=s3://pokepad-athena-results-<env>-<account>-<region>/results/
 export DYNAMODB_TABLE_NAME=pokepad-query-executions
 
@@ -130,7 +130,7 @@ Costs are per-request at typical low-to-medium volumes. All services have a free
 
 | Service | Cost driver | Estimate |
 |---------|-------------|----------|
-| **Anthropic (Claude Sonnet 4.6)** | $3/M input tokens, $15/M output tokens. Schema is prompt-cached (90 % cheaper on cache hits). | ~$0.003–$0.008 per search |
+| **OpenAI (GPT-4o)** | $2.50/M input tokens, $10/M output tokens. | ~$0.003–$0.007 per search |
 | **Athena** | $5 per TB scanned. Capped at 1 GB per query by the workgroup. | < $0.005 per query; often < $0.001 on small datasets |
 | **Lambda** | $0.0000166667 per GB-second + $0.20/M requests. 512 MB × avg 5 s = 2.5 GB-s. | ~$0.00004 per invocation |
 | **API Gateway (HTTP API)** | $1.00 per million requests | ~$0.000001 per request |
@@ -143,4 +143,4 @@ Costs are per-request at typical low-to-medium volumes. All services have a free
 
 **Typical all-in cost per search: ~$0.004–$0.013**
 
-The largest variable cost is Anthropic — particularly the first call before the schema is cached. Athena cost scales with data volume scanned, but the 1 GB/query cap prevents runaway charges.
+The largest variable cost is OpenAI. Athena cost scales with data volume scanned, but the 1 GB/query cap prevents runaway charges.

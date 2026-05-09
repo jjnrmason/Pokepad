@@ -43,7 +43,7 @@ Creates the `ecommerce_gold` Glue database with four external tables that point 
 | `orders` | `OrderId`, `CustomerId`, `OrderDate`, `Status`, `TotalAmount` |
 | `order_items` | `OrderItemId`, `OrderId`, `ProductId`, `Quantity`, `UnitPrice`, `Subtotal` |
 
-The Lambda reads this schema at query time and injects it into the Claude prompt so the model knows the exact column names and types.
+The Lambda reads this schema at query time and injects it into the OpenAI prompt so the model knows the exact column names and types.
 
 ### AthenaConstruct
 

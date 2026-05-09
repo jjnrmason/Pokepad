@@ -6,7 +6,7 @@ using Amazon.DynamoDBv2;
 using Amazon.Glue;
 using Amazon.SimpleSystemsManagement;
 using Amazon.SimpleSystemsManagement.Model;
-using Anthropic;
+using OpenAI;
 using Pokepad.Lambda;
 using Pokepad.Lambda.Models;
 using Pokepad.Lambda.Services;
@@ -20,8 +20,8 @@ builder.Services.AddAWSService<IAmazonDynamoDB>();
 
 if (!builder.Environment.IsDevelopment())
 {
-    var ssmParamName = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY_PARAM")
-                       ?? throw new InvalidOperationException("ANTHROPIC_API_KEY_PARAM is required");
+    var ssmParamName = Environment.GetEnvironmentVariable("API_KEY_PARAM")
+                       ?? throw new InvalidOperationException("API_KEY_PARAM is required");
 
     using var ssm = new AmazonSimpleSystemsManagementClient();
     var ssmResponse = await ssm.GetParameterAsync(new GetParameterRequest
@@ -30,7 +30,12 @@ if (!builder.Environment.IsDevelopment())
         WithDecryption = true
     });
 
-    Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY", ssmResponse.Parameter.Value);
+    builder.Services.AddSingleton(_ => new OpenAIClient(ssmResponse.Parameter.Value));
+} else 
+{
+    builder.Services.AddSingleton(_ => new OpenAIClient(
+        Environment.GetEnvironmentVariable("API_KEY") ?? throw new InvalidOperationException("API_KEY is required")
+    ));
 }
 
 builder.Services.AddOpenApi(options =>
@@ -43,7 +48,7 @@ builder.Services.AddOpenApi(options =>
             Version = "v1",
             Description = """
                 Natural language search over e-commerce data. Ask a question in plain English;
-                Claude generates the SQL, Athena executes it, and results are returned as structured JSON.
+                OpenAI generates the SQL, Athena executes it, and results are returned as structured JSON.
 
                 ## Authentication
 
@@ -102,10 +107,9 @@ builder.Services.AddOpenApi(options =>
     });
 });
 
-builder.Services.AddSingleton<AnthropicClient>();
 builder.Services.AddSingleton<GlueSchemaService>();
 builder.Services.AddSingleton<AthenaService>();
-builder.Services.AddSingleton<ClaudeService>();
+builder.Services.AddSingleton<OpenAiService>();
 builder.Services.AddSingleton<SqlValidator>();
 builder.Services.AddSingleton<QueryTrackingService>();
 builder.Services.AddAuthentication("ApiGateway")
@@ -128,12 +132,12 @@ v1.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
 v1.MapPost("/search", async (
     SearchRequest request,
     GlueSchemaService glue,
-    ClaudeService claude,
+    OpenAiService openAi,
     AthenaService athena,
     SqlValidator validator) =>
 {
     var schema = await glue.GetSchemaAsync();
-    var sql = await claude.GenerateSqlAsync(request.Question, schema);
+    var sql = await openAi.GenerateSqlAsync(request.Question, schema);
 
     validator.Validate(sql);
 
@@ -142,7 +146,7 @@ v1.MapPost("/search", async (
 })
     .WithName("Search")
     .WithSummary("Synchronous natural language search")
-    .WithDescription("Translates a natural-language question into SQL via Claude, executes it against Athena, and returns the results. Blocks until the query completes (up to the 30 s Lambda timeout).")
+    .WithDescription("Translates a natural-language question into SQL via OpenAI, executes it against Athena, and returns the results. Blocks until the query completes (up to the 30 s Lambda timeout).")
     .WithTags("Search")
     .Produces<SearchResponse>()
     .RequireAuthorization();
@@ -151,7 +155,7 @@ v1.MapPost("/query/start", async (
     HttpContext ctx,
     SearchRequest request,
     GlueSchemaService glue,
-    ClaudeService claude,
+    OpenAiService openAi,
     AthenaService athena,
     SqlValidator validator,
     QueryTrackingService tracking) =>
@@ -159,7 +163,7 @@ v1.MapPost("/query/start", async (
     var userId = GetUserId(ctx);
 
     var schema = await glue.GetSchemaAsync();
-    var sql = await claude.GenerateSqlAsync(request.Question, schema);
+    var sql = await openAi.GenerateSqlAsync(request.Question, schema);
     validator.Validate(sql);
 
     var executionId = await athena.StartAsync(sql);
