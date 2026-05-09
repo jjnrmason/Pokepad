@@ -36,7 +36,11 @@ builder.Services.AddSingleton<SqlValidator>();
 
 var app = builder.Build();
 
-app.MapPost("/search", async (
+var v1 = app.MapGroup("/v1");
+
+v1.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+
+v1.MapPost("/search", async (
     SearchRequest request,
     GlueSchemaService glue,
     ClaudeService claude,

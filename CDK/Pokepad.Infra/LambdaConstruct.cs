@@ -2,6 +2,7 @@ using Amazon.CDK;
 using Amazon.CDK.AWS.Apigatewayv2;
 using Amazon.CDK.AWS.IAM;
 using Amazon.CDK.AWS.Lambda;
+using Amazon.CDK.AWS.Logs;
 using Amazon.CDK.AwsApigatewayv2Integrations;
 using Constructs;
 using HttpMethod = Amazon.CDK.AWS.Apigatewayv2.HttpMethod;
@@ -170,18 +171,51 @@ public sealed class LambdaConstruct : Construct
 
     private HttpApi CreateHttpApi(Function function)
     {
+        var accessLogGroup = new LogGroup(this, "api-access-logs", new LogGroupProps
+        {
+            LogGroupName = "/pokepad/api/access-logs",
+            Retention = RetentionDays.ONE_MONTH,
+            RemovalPolicy = RemovalPolicy.DESTROY
+        });
+
         var integration = new HttpLambdaIntegration("search-integration", function);
 
         var api = new HttpApi(this, "search-api", new HttpApiProps
         {
             ApiName = "pokepad-search-api",
-            Description = "Pokepad natural language search API"
+            Description = "Pokepad natural language search API",
+            CorsPreflight = new CorsPreflightOptions
+            {
+                AllowOrigins = ["*"],
+                AllowMethods = [CorsHttpMethod.POST, CorsHttpMethod.GET],
+                AllowHeaders = ["Content-Type", "Authorization"],
+                MaxAge = Duration.Days(1)
+            }
+        });
+
+        var cfnStage = (CfnStage)api.DefaultStage!.Node.DefaultChild!;
+        cfnStage.AccessLogSettings = new CfnStage.AccessLogSettingsProperty
+        {
+            DestinationArn = accessLogGroup.LogGroupArn,
+            Format = "{\"requestId\":\"$context.requestId\",\"ip\":\"$context.identity.sourceIp\",\"requestTime\":\"$context.requestTime\",\"method\":\"$context.httpMethod\",\"routeKey\":\"$context.routeKey\",\"status\":\"$context.status\",\"responseLength\":\"$context.responseLength\",\"integrationLatency\":\"$context.integrationLatency\",\"errorMessage\":\"$context.error.message\"}"
+        };
+        cfnStage.DefaultRouteSettings = new CfnStage.RouteSettingsProperty
+        {
+            ThrottlingBurstLimit = 10,
+            ThrottlingRateLimit = 10
+        };
+
+        api.AddRoutes(new AddRoutesOptions
+        {
+            Path = "/v1/search",
+            Methods = [HttpMethod.POST],
+            Integration = integration
         });
 
         api.AddRoutes(new AddRoutesOptions
         {
-            Path = "/search",
-            Methods = [HttpMethod.POST],
+            Path = "/v1/health",
+            Methods = [HttpMethod.GET],
             Integration = integration
         });
 
