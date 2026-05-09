@@ -3,6 +3,7 @@ using Amazon.CDK.AWS.Apigatewayv2;
 using Amazon.CDK.AWS.IAM;
 using Amazon.CDK.AWS.Lambda;
 using Amazon.CDK.AWS.Logs;
+using Amazon.CDK.AwsApigatewayv2Authorizers;
 using Amazon.CDK.AwsApigatewayv2Integrations;
 using Constructs;
 using HttpMethod = Amazon.CDK.AWS.Apigatewayv2.HttpMethod;
@@ -15,12 +16,13 @@ public sealed class LambdaConstruct : Construct
         Construct scope,
         string id,
         DataLakeConstruct dataLake,
-        GlueCatalogConstruct glueCatalog)
+        GlueCatalogConstruct glueCatalog,
+        CognitoConstruct cognito)
         : base(scope, id)
     {
         var role = CreateLambdaRole(dataLake, glueCatalog);
         var function = CreateLambdaFunction(role, dataLake);
-        var api = CreateHttpApi(function);
+        var api = CreateHttpApi(function, cognito);
 
         _ = new CfnOutput(this, "SearchApiUrl", new CfnOutputProps
         {
@@ -169,8 +171,15 @@ public sealed class LambdaConstruct : Construct
         });
     }
 
-    private HttpApi CreateHttpApi(Function function)
+    private HttpApi CreateHttpApi(Function function, CognitoConstruct cognito)
     {
+        var stack = Stack.Of(this);
+        var issuer = $"https://cognito-idp.{stack.Region}.amazonaws.com/{cognito.UserPool.UserPoolId}";
+        var authorizer = new HttpJwtAuthorizer("cognito-authorizer", issuer, new HttpJwtAuthorizerProps
+        {
+            JwtAudience = [cognito.UserPoolClient.UserPoolClientId]
+        });
+
         var accessLogGroup = new LogGroup(this, "api-access-logs", new LogGroupProps
         {
             LogGroupName = "/pokepad/api/access-logs",
@@ -209,7 +218,8 @@ public sealed class LambdaConstruct : Construct
         {
             Path = "/v1/search",
             Methods = [HttpMethod.POST],
-            Integration = integration
+            Integration = integration,
+            Authorizer = authorizer
         });
 
         api.AddRoutes(new AddRoutesOptions
