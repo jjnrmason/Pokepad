@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/CDK/">
+    <File Path="CDK\README.md" />
     <Project Path="CDK/Pokepad.Infra.Tests/Pokepad.Infra.Tests.csproj" />
     <Project Path="CDK/Pokepad.Infra/Pokepad.Infra.csproj" />
   </Folder>
@@ -7,6 +8,7 @@
     <Project Path="Data Generation/Pokepad.DataGeneration/Pokepad.DataGeneration.csproj" />
   </Folder>
   <Folder Name="/Lambda/">
+    <File Path="Lambda\README.md" />
     <Project Path="Lambda/Pokepad.Lambda/Pokepad.Lambda.csproj" />
   </Folder>
   <Folder Name="/Project Files/">

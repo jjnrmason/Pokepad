@@ -299,6 +299,20 @@ public sealed class LambdaConstruct : Construct
             Authorizer = authorizer
         });
 
+        api.AddRoutes(new AddRoutesOptions
+        {
+            Path = "/openapi/v1.json",
+            Methods = [HttpMethod.GET],
+            Integration = integration
+        });
+
+        api.AddRoutes(new AddRoutesOptions
+        {
+            Path = "/scalar/{proxy+}",
+            Methods = [HttpMethod.GET],
+            Integration = integration
+        });
+
         return api;
     }
 }

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Scalar.AspNetCore;
 using Amazon.Athena;
 using Amazon.Athena.Model;
 using Amazon.DynamoDBv2;
@@ -32,6 +33,75 @@ if (!builder.Environment.IsDevelopment())
     Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY", ssmResponse.Parameter.Value);
 }
 
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer((doc, _, _) =>
+    {
+        doc.Info = new()
+        {
+            Title = "Pokepad Search API",
+            Version = "v1",
+            Description = """
+                Natural language search over e-commerce data. Ask a question in plain English;
+                Claude generates the SQL, Athena executes it, and results are returned as structured JSON.
+
+                ## Authentication
+
+                All endpoints except `GET /v1/health` require a Cognito JWT passed as `Authorization: Bearer <token>`.
+                Obtain a token via the Cognito `InitiateAuth` API using `USER_PASSWORD_AUTH` flow.
+
+                ## Data schema
+
+                Queries run against the `ecommerce_gold` Glue database. Four tables are available:
+
+                ### customers
+                | Column | Type | Description |
+                |--------|------|-------------|
+                | CustomerId | string | Unique customer identifier (UUID) |
+                | FirstName | string | First name |
+                | LastName | string | Last name |
+                | Email | string | Email address — unique per customer |
+                | Phone | string | Contact phone number |
+                | Address | string | Street address |
+                | City | string | City |
+                | Country | string | Country |
+                | CreatedAt | timestamp | Account creation timestamp |
+
+                ### products
+                | Column | Type | Description |
+                |--------|------|-------------|
+                | ProductId | string | Unique product identifier (UUID) |
+                | Name | string | Product display name |
+                | Category | string | Electronics, Clothing, Home & Garden, Sports, Books, Toys, Beauty, Automotive |
+                | Description | string | Product description |
+                | Price | double | Unit price in USD |
+                | StockQuantity | int | Available stock quantity |
+
+                ### orders
+                | Column | Type | Description |
+                |--------|------|-------------|
+                | OrderId | string | Unique order identifier (UUID) |
+                | CustomerId | string | Foreign key → customers.CustomerId |
+                | OrderDate | timestamp | Timestamp when the order was placed |
+                | Status | string | Pending, Processing, Shipped, Delivered, Cancelled |
+                | TotalAmount | double | Total order value in USD |
+                | ShippingAddress | string | Full shipping address for this order |
+
+                ### order_items
+                | Column | Type | Description |
+                |--------|------|-------------|
+                | OrderItemId | string | Unique order item identifier (UUID) |
+                | OrderId | string | Foreign key → orders.OrderId |
+                | ProductId | string | Foreign key → products.ProductId |
+                | Quantity | int | Number of units ordered |
+                | UnitPrice | double | Unit price at time of order in USD |
+                | Subtotal | double | Line total: Quantity × UnitPrice in USD |
+                """
+        };
+        return Task.CompletedTask;
+    });
+});
+
 builder.Services.AddSingleton<AnthropicClient>();
 builder.Services.AddSingleton<GlueSchemaService>();
 builder.Services.AddSingleton<AthenaService>();
@@ -41,9 +111,16 @@ builder.Services.AddSingleton<QueryTrackingService>();
 
 var app = builder.Build();
 
+app.MapOpenApi();
+app.MapScalarApiReference();
+
 var v1 = app.MapGroup("/v1");
 
-v1.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+v1.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
+    .WithName("Health")
+    .WithSummary("Health check")
+    .WithDescription("Returns 200 OK when the service is running. No authentication required.")
+    .WithTags("Health");
 
 v1.MapPost("/search", async (
     SearchRequest request,
@@ -59,7 +136,13 @@ v1.MapPost("/search", async (
 
     var results = await athena.ExecuteAsync(sql);
     return Results.Ok(new SearchResponse(sql, results.Columns, results.Rows));
-});
+})
+    .WithName("Search")
+    .WithSummary("Synchronous natural language search")
+    .WithDescription("Translates a natural-language question into SQL via Claude, executes it against Athena, and returns the results. Blocks until the query completes (up to the 30 s Lambda timeout).")
+    .WithTags("Search")
+    .Produces<SearchResponse>()
+    .RequireAuthorization();
 
 v1.MapPost("/query/start", async (
     HttpContext ctx,
@@ -80,7 +163,12 @@ v1.MapPost("/query/start", async (
     await tracking.TrackAsync(executionId, userId);
 
     return Results.Accepted($"/v1/query/{executionId}/status", new { executionId });
-});
+})
+    .WithName("StartQuery")
+    .WithSummary("Start an asynchronous query")
+    .WithDescription("Starts an Athena query and returns immediately with an executionId. Poll /v1/query/{id}/status until SUCCEEDED, then fetch results from /v1/query/{id}/results.")
+    .WithTags("Async Query")
+    .RequireAuthorization();
 
 v1.MapGet("/query/{id}/status", async (
     HttpContext ctx,
@@ -96,7 +184,12 @@ v1.MapGet("/query/{id}/status", async (
 
     var execution = await athena.GetExecutionAsync(id);
     return Results.Ok(new { executionId = id, status = execution.Status.State.Value });
-});
+})
+    .WithName("GetQueryStatus")
+    .WithSummary("Poll query status")
+    .WithDescription("Returns the current Athena execution state (QUEUED, RUNNING, SUCCEEDED, FAILED, CANCELLED). Returns 404 if unknown/expired, 403 if not the query owner.")
+    .WithTags("Async Query")
+    .RequireAuthorization();
 
 v1.MapGet("/query/{id}/results", async (
     HttpContext ctx,
@@ -116,7 +209,13 @@ v1.MapGet("/query/{id}/results", async (
 
     var results = await athena.FetchResultsAsync(id);
     return Results.Ok(new SearchResponse(execution.Query, results.Columns, results.Rows));
-});
+})
+    .WithName("GetQueryResults")
+    .WithSummary("Fetch results for a completed query")
+    .WithDescription("Returns query results once status is SUCCEEDED. Returns 409 Conflict with the current status if the query is still running.")
+    .WithTags("Async Query")
+    .Produces<SearchResponse>()
+    .RequireAuthorization();
 
 app.Run();
 
