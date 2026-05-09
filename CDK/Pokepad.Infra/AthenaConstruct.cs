@@ -1,14 +1,13 @@
-using Amazon.CDK;
 using Amazon.CDK.AWS.Athena;
 using Amazon.CDK.AWS.S3;
+using Amazon.CDK;
 using Constructs;
 
 namespace Pokepad.Infra;
 
-public sealed class AthenaStack : Stack
+public sealed class AthenaConstruct : Construct
 {
-    public AthenaStack(Construct scope, string id, Bucket athenaResultsBucket, IStackProps? props = null)
-        : base(scope, id, props)
+    public AthenaConstruct(Construct scope, string id, Bucket athenaResultsBucket) : base(scope, id)
     {
         new CfnWorkGroup(this, "pokepad-workgroup", new CfnWorkGroupProps
         {

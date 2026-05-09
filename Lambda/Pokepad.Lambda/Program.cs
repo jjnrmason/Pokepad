@@ -1,5 +1,7 @@
 using Amazon.Athena;
 using Amazon.Glue;
+using Amazon.SimpleSystemsManagement;
+using Amazon.SimpleSystemsManagement.Model;
 using Anthropic;
 using Pokepad.Lambda;
 using Pokepad.Lambda.Models;
@@ -10,6 +12,22 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.HttpApi);
 builder.Services.AddAWSService<IAmazonGlue>();
 builder.Services.AddAWSService<IAmazonAthena>();
+
+if (!builder.Environment.IsDevelopment())
+{
+    var ssmParamName = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY_PARAM")
+                       ?? throw new InvalidOperationException("ANTHROPIC_API_KEY_PARAM is required");
+
+    using var ssm = new AmazonSimpleSystemsManagementClient();
+    var ssmResponse = await ssm.GetParameterAsync(new GetParameterRequest
+    {
+        Name = ssmParamName,
+        WithDecryption = true
+    });
+
+    Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY", ssmResponse.Parameter.Value);
+}
+
 builder.Services.AddSingleton<AnthropicClient>();
 builder.Services.AddSingleton<GlueSchemaService>();
 builder.Services.AddSingleton<AthenaService>();

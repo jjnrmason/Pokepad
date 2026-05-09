@@ -4,16 +4,17 @@ using Constructs;
 
 namespace Pokepad.Infra;
 
-public sealed class DataLakeStack : Stack
+public sealed class DataLakeConstruct : Construct
 {
-    public DataLakeStack(Construct scope, string id, IStackProps? props = null) : base(scope, id, props)
+    public DataLakeConstruct(Construct scope, string id) : base(scope, id)
     {
         var env = Node.TryGetContext("env")?.ToString() ?? "dev";
+        var stack = Stack.Of(this);
 
-        Bronze = CreateMedallionBucket("bronze", env);
-        Silver = CreateMedallionBucket("silver", env);
-        Gold = CreateMedallionBucket("gold", env);
-        AthenaResults = CreateMedallionBucket("athena-results", env, queryResultRetentionDays: 7);
+        Bronze = CreateMedallionBucket("bronze", env, stack);
+        Silver = CreateMedallionBucket("silver", env, stack);
+        Gold = CreateMedallionBucket("gold", env, stack);
+        AthenaResults = CreateMedallionBucket("athena-results", env, stack, queryResultRetentionDays: 7);
     }
 
     public Bucket Bronze { get; }
@@ -21,7 +22,7 @@ public sealed class DataLakeStack : Stack
     public Bucket Gold { get; }
     public Bucket AthenaResults { get; }
 
-    private Bucket CreateMedallionBucket(string tier, string env, int? queryResultRetentionDays = null)
+    private Bucket CreateMedallionBucket(string tier, string env, Stack stack, int? queryResultRetentionDays = null)
     {
         var lifecycleRules = queryResultRetentionDays is { } days
             ? new LifecycleRule[]
@@ -37,7 +38,7 @@ public sealed class DataLakeStack : Stack
 
         return new Bucket(this, $"{tier}-bucket", new BucketProps
         {
-            BucketName = $"pokepad-{tier}-{env}-{Account}-{Region}",
+            BucketName = $"pokepad-{tier}-{env}-{stack.Account}-{stack.Region}",
             Versioned = true,
             Encryption = BucketEncryption.S3_MANAGED,
             BlockPublicAccess = BlockPublicAccess.BLOCK_ALL,

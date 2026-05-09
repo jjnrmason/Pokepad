@@ -5,15 +5,17 @@ using Constructs;
 
 namespace Pokepad.Infra;
 
-public sealed class GlueCatalogStack : Stack
+public sealed class GlueCatalogConstruct : Construct
 {
     public string DatabaseName { get; } = "ecommerce_gold";
 
-    public GlueCatalogStack(Construct scope, string id, Bucket goldBucket, IStackProps? props = null) : base(scope, id, props)
+    public GlueCatalogConstruct(Construct scope, string id, Bucket goldBucket) : base(scope, id)
     {
+        var account = Stack.Of(this).Account;
+
         var database = new CfnDatabase(this, "ecommerce-gold-database", new CfnDatabaseProps
         {
-            CatalogId = Account,
+            CatalogId = account,
             DatabaseInput = new CfnDatabase.DatabaseInputProperty
             {
                 Name = "ecommerce_gold",
@@ -21,17 +23,17 @@ public sealed class GlueCatalogStack : Stack
             }
         });
 
-        CreateTable(database, goldBucket, "customers", CustomersColumns());
-        CreateTable(database, goldBucket, "products", ProductsColumns());
-        CreateTable(database, goldBucket, "orders", OrdersColumns());
-        CreateTable(database, goldBucket, "order_items", OrderItemsColumns());
+        CreateTable(database, goldBucket, "customers", CustomersColumns(), account);
+        CreateTable(database, goldBucket, "products", ProductsColumns(), account);
+        CreateTable(database, goldBucket, "orders", OrdersColumns(), account);
+        CreateTable(database, goldBucket, "order_items", OrderItemsColumns(), account);
     }
 
-    private void CreateTable(CfnDatabase database, Bucket goldBucket, string tableName, CfnTable.ColumnProperty[] columns)
+    private void CreateTable(CfnDatabase database, Bucket goldBucket, string tableName, CfnTable.ColumnProperty[] columns, string account)
     {
         new CfnTable(this, $"{tableName}-table", new CfnTableProps
         {
-            CatalogId = Account,
+            CatalogId = account,
             DatabaseName = database.Ref,
             TableInput = new CfnTable.TableInputProperty
             {

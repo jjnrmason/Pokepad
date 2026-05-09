@@ -10,12 +10,6 @@ var tags = new Dictionary<string, string>
     { "environment", env }
 };
 
-var dataLakeStack = new DataLakeStack(app, "PokepadDataLake", new StackProps { Tags = tags });
-
-var glueCatalogStack = new GlueCatalogStack(app, "PokepadGlueCatalog", dataLakeStack.Gold, new StackProps { Tags = tags });
-
-_ = new AthenaStack(app, "PokepadAthena", dataLakeStack.AthenaResults, new StackProps { Tags = tags });
-
-_ = new IamStack(app, "PokepadIam", dataLakeStack, glueCatalogStack, new StackProps { Tags = tags });
+_ = new BuilderStack(app, "Pokepad", new StackProps { Tags = tags });
 
 app.Synth();

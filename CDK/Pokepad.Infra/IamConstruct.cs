@@ -5,10 +5,10 @@ using Constructs;
 
 namespace Pokepad.Infra;
 
-public sealed class IamStack : Stack
+public sealed class IamConstruct : Construct
 {
-    public IamStack(Construct scope, string id, DataLakeStack dataLake, GlueCatalogStack glueCatalog, IStackProps? props = null)
-        : base(scope, id, props)
+    public IamConstruct(Construct scope, string id, DataLakeConstruct dataLake, GlueCatalogConstruct glueCatalog)
+        : base(scope, id)
     {
         DataIngestionRole = CreateDataIngestionRole(dataLake.Bronze);
         DataAnalystRole = CreateDataAnalystRole(dataLake.Gold, dataLake.AthenaResults, glueCatalog.DatabaseName);
@@ -47,10 +47,12 @@ public sealed class IamStack : Stack
 
     private Role CreateDataAnalystRole(Bucket gold, Bucket athenaResults, string databaseName)
     {
+        var stack = Stack.Of(this);
+
         var role = new Role(this, "data-analyst-role", new RoleProps
         {
             RoleName = "pokepad-data-analyst",
-            AssumedBy = new AccountPrincipal(Account),
+            AssumedBy = new AccountPrincipal(stack.Account),
             Description = "Allows analysts to query Gold layer data via Athena"
         });
 
@@ -82,9 +84,9 @@ public sealed class IamStack : Stack
             Resources = [athenaResults.BucketArn]
         }));
 
-        var catalogArn = Arn.Format(new ArnComponents { Service = "glue", Resource = "catalog" }, this);
-        var databaseArn = Arn.Format(new ArnComponents { Service = "glue", Resource = "database", ResourceName = databaseName }, this);
-        var tableArn = Arn.Format(new ArnComponents { Service = "glue", Resource = "table", ResourceName = $"{databaseName}/*" }, this);
+        var catalogArn = Arn.Format(new ArnComponents { Service = "glue", Resource = "catalog" }, stack);
+        var databaseArn = Arn.Format(new ArnComponents { Service = "glue", Resource = "database", ResourceName = databaseName }, stack);
+        var tableArn = Arn.Format(new ArnComponents { Service = "glue", Resource = "table", ResourceName = $"{databaseName}/*" }, stack);
 
         role.AddToPolicy(new PolicyStatement(new PolicyStatementProps
         {
@@ -93,7 +95,7 @@ public sealed class IamStack : Stack
             Resources = [catalogArn, databaseArn, tableArn]
         }));
 
-        var workgroupArn = Arn.Format(new ArnComponents { Service = "athena", Resource = "workgroup", ResourceName = "pokepad" }, this);
+        var workgroupArn = Arn.Format(new ArnComponents { Service = "athena", Resource = "workgroup", ResourceName = "pokepad" }, stack);
 
         role.AddToPolicy(new PolicyStatement(new PolicyStatementProps
         {
