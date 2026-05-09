@@ -6,15 +6,16 @@ namespace Pokepad.Infra.Tests.DataLakeStack.WhenWorkingWithTheDataLakeStack;
 
 public class DataLakeStackTestBase
 {
-    protected Pokepad.Infra.DataLakeStack DataLakeStack { get; private set; } = null!;
+    protected DataLakeConstruct DataLakeConstruct { get; private set; } = null!;
     protected Template Template { get; private set; } = null!;
 
     [OneTimeSetUp]
     public virtual void OneTimeSetUp()
     {
         var app = new App();
-        this.DataLakeStack = new Pokepad.Infra.DataLakeStack(app, "TestStack");
-        this.Template = Template.FromStack(this.DataLakeStack);
+        var stack = new Stack(app, "TestStack");
+        this.DataLakeConstruct = new DataLakeConstruct(stack, "DataLake");
+        this.Template = Template.FromStack(stack);
     }
 
     [SetUp]

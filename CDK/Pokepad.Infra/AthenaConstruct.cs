@@ -23,7 +23,8 @@ public sealed class AthenaConstruct : Construct
                 EnforceWorkGroupConfiguration = true,
                 PublishCloudWatchMetricsEnabled = true,
                 BytesScannedCutoffPerQuery = 1_073_741_824 // 1 GB cost guard
-            }
+            },
+            RecursiveDeleteOption = true
         });
     }
 }

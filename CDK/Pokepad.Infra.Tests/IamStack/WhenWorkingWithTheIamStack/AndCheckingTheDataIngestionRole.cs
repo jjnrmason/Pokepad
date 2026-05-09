@@ -9,7 +9,7 @@ public partial class WhenWorkingWithTheIamStack
         [Test]
         public void ThenItExposesTheDataIngestionRoleAsAPublicProperty()
         {
-            Assert.That(this.IamStack.DataIngestionRole, Is.Not.Null);
+            Assert.That(this.IamConstruct.DataIngestionRole, Is.Not.Null);
         }
 
         [Test]

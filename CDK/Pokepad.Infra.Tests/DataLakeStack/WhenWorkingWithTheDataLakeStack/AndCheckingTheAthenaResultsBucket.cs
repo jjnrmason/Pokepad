@@ -9,13 +9,13 @@ public partial class WhenWorkingWithTheDataLakeStack
         [Test]
         public void ThenItExposesTheAthenaResultsBucketAsAPublicProperty()
         {
-            Assert.That(this.DataLakeStack.AthenaResults, Is.Not.Null);
+            Assert.That(this.DataLakeConstruct.AthenaResults, Is.Not.Null);
         }
 
         [Test]
         public void ThenTheAthenaResultsBucketHasTheExpectedConstructId()
         {
-            Assert.That(this.DataLakeStack.AthenaResults.Node.Id, Is.EqualTo("athena-results-bucket"));
+            Assert.That(this.DataLakeConstruct.AthenaResults.Node.Id, Is.EqualTo("athena-results-bucket"));
         }
     }
 }

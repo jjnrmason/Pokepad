@@ -9,13 +9,13 @@ public partial class WhenWorkingWithTheDataLakeStack
         [Test]
         public void ThenItExposesTheGoldBucketAsAPublicProperty()
         {
-            Assert.That(this.DataLakeStack.Gold, Is.Not.Null);
+            Assert.That(this.DataLakeConstruct.Gold, Is.Not.Null);
         }
 
         [Test]
         public void ThenTheGoldBucketHasTheExpectedConstructId()
         {
-            Assert.That(this.DataLakeStack.Gold.Node.Id, Is.EqualTo("gold-bucket"));
+            Assert.That(this.DataLakeConstruct.Gold.Node.Id, Is.EqualTo("gold-bucket"));
         }
     }
 }

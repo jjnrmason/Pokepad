@@ -9,7 +9,7 @@ public partial class WhenWorkingWithTheIamStack
         [Test]
         public void ThenItExposesTheDataAnalystRoleAsAPublicProperty()
         {
-            Assert.That(this.IamStack.DataAnalystRole, Is.Not.Null);
+            Assert.That(this.IamConstruct.DataAnalystRole, Is.Not.Null);
         }
 
         [Test]

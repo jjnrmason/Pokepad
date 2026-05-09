@@ -9,7 +9,7 @@ public partial class WhenWorkingWithTheIamStack
         [Test]
         public void ThenItExposesTheGlueCrawlerRoleAsAPublicProperty()
         {
-            Assert.That(this.IamStack.GlueCrawlerRole, Is.Not.Null);
+            Assert.That(this.IamConstruct.GlueCrawlerRole, Is.Not.Null);
         }
 
         [Test]

@@ -3,7 +3,7 @@ using Amazon.Athena.Model;
 
 namespace Pokepad.Lambda.Services;
 
-public sealed class AthenaService(IAmazonAthena athena, IConfiguration config)
+public sealed class AthenaService(IAmazonAthena athena, IConfiguration config, ILogger<AthenaService> logger)
 {
     private const string WorkGroup = "pokepad";
     private readonly string _outputLocation = config["ATHENA_OUTPUT_LOCATION"]
@@ -18,6 +18,8 @@ public sealed class AthenaService(IAmazonAthena athena, IConfiguration config)
 
     public async Task<string> StartAsync(string sql)
     {
+        logger.LogInformation("Submitting SQL: {Sql}", sql);
+
         var response = await athena.StartQueryExecutionAsync(new StartQueryExecutionRequest
         {
             QueryString = sql,
@@ -25,6 +27,8 @@ public sealed class AthenaService(IAmazonAthena athena, IConfiguration config)
             QueryExecutionContext = new QueryExecutionContext { Database = "ecommerce_gold" },
             ResultConfiguration = new ResultConfiguration { OutputLocation = _outputLocation }
         });
+
+        logger.LogInformation("Query started: {ExecutionId}", response.QueryExecutionId);
         return response.QueryExecutionId;
     }
 
@@ -49,10 +53,25 @@ public sealed class AthenaService(IAmazonAthena athena, IConfiguration config)
             var execution = await GetExecutionAsync(executionId);
             var state = execution.Status.State;
 
-            if (state == QueryExecutionState.SUCCEEDED) return;
+            if (state == QueryExecutionState.SUCCEEDED)
+            {
+                var stats = execution.Statistics;
+                logger.LogInformation(
+                    "Query {ExecutionId} succeeded: {DataScannedMB:F2} MB scanned, {DurationMs} ms engine time",
+                    executionId,
+                    stats.DataScannedInBytes / 1_048_576.0,
+                    stats.EngineExecutionTimeInMillis);
+                return;
+            }
+
             if (state == QueryExecutionState.FAILED || state == QueryExecutionState.CANCELLED)
+            {
+                logger.LogError(
+                    "Query {ExecutionId} {State}: {Reason}",
+                    executionId, state, execution.Status.StateChangeReason);
                 throw new InvalidOperationException(
                     $"Query {state}: {execution.Status.StateChangeReason}");
+            }
 
             await Task.Delay(500);
         }

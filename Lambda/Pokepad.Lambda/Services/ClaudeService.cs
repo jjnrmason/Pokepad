@@ -3,12 +3,13 @@ using Anthropic.Models.Messages;
 
 namespace Pokepad.Lambda.Services;
 
-public sealed class ClaudeService(AnthropicClient client)
+public sealed class ClaudeService(AnthropicClient client, ILogger<ClaudeService> logger)
 {
     private const string Model = "claude-sonnet-4-6";
 
     public async Task<string> GenerateSqlAsync(string question, string schema)
     {
+        logger.LogInformation("Generating SQL for question: {Question}", question);
         var systemText = $"""
             You are a SQL expert working with an AWS Athena database.
             Only write SELECT queries. Do not use semicolons.
@@ -36,7 +37,12 @@ public sealed class ClaudeService(AnthropicClient client)
         });
 
         if (response.Content.Count > 0 && response.Content[0].TryPickText(out var textBlock))
-            return textBlock!.Text.Trim();
+        {
+            var sql = textBlock!.Text.Trim();
+            logger.LogInformation("Generated SQL ({InputTokens} in / {OutputTokens} out): {Sql}",
+                response.Usage.InputTokens, response.Usage.OutputTokens, sql);
+            return sql;
+        }
 
         throw new InvalidOperationException("No text content in Claude response.");
     }

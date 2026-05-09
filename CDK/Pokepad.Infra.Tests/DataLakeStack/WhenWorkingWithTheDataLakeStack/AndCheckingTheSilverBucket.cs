@@ -9,13 +9,13 @@ public partial class WhenWorkingWithTheDataLakeStack
         [Test]
         public void ThenItExposesTheSilverBucketAsAPublicProperty()
         {
-            Assert.That(this.DataLakeStack.Silver, Is.Not.Null);
+            Assert.That(this.DataLakeConstruct.Silver, Is.Not.Null);
         }
 
         [Test]
         public void ThenTheSilverBucketHasTheExpectedConstructId()
         {
-            Assert.That(this.DataLakeStack.Silver.Node.Id, Is.EqualTo("silver-bucket"));
+            Assert.That(this.DataLakeConstruct.Silver.Node.Id, Is.EqualTo("silver-bucket"));
         }
     }
 }

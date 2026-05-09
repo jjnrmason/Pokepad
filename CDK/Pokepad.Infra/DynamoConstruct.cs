@@ -18,5 +18,11 @@ public sealed class DynamoConstruct : Construct
             BillingMode = BillingMode.PAY_PER_REQUEST,
             RemovalPolicy = RemovalPolicy.DESTROY
         });
+        
+        _ = new CfnOutput(this, "TableName", new CfnOutputProps
+        {
+            Value = Table.TableName,
+            Description = "Name of the dynamoDB table used for async queries"
+        });
     }
 }

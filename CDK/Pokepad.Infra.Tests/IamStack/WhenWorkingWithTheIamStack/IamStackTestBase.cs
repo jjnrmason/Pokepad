@@ -6,17 +6,18 @@ namespace Pokepad.Infra.Tests.IamStack.WhenWorkingWithTheIamStack;
 
 public class IamStackTestBase
 {
-    protected Pokepad.Infra.IamStack IamStack { get; private set; } = null!;
+    protected IamConstruct IamConstruct { get; private set; } = null!;
     protected Template Template { get; private set; } = null!;
 
     [OneTimeSetUp]
     public virtual void OneTimeSetUp()
     {
         var app = new App();
-        var dataLakeStack = new Pokepad.Infra.DataLakeStack(app, "TestDataLakeStack");
-        var glueCatalogStack = new Pokepad.Infra.GlueCatalogStack(app, "TestGlueCatalogStack", dataLakeStack.Gold);
-        this.IamStack = new Pokepad.Infra.IamStack(app, "TestIamStack", dataLakeStack, glueCatalogStack);
-        this.Template = Template.FromStack(this.IamStack);
+        var stack = new Stack(app, "TestStack");
+        var dataLake = new DataLakeConstruct(stack, "DataLake");
+        var glueCatalog = new GlueCatalogConstruct(stack, "GlueCatalog", dataLake.Gold);
+        this.IamConstruct = new IamConstruct(stack, "Iam", dataLake, glueCatalog);
+        this.Template = Template.FromStack(stack);
     }
 
     [SetUp]

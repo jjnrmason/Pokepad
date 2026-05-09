@@ -1,5 +1,6 @@
 using Amazon.CDK;
 using Amazon.CDK.AWS.Apigatewayv2;
+using Amazon.CDK.AWS.CloudWatch;
 using Amazon.CDK.AWS.IAM;
 using Amazon.CDK.AWS.Lambda;
 using Amazon.CDK.AWS.Logs;
@@ -23,6 +24,7 @@ public sealed class LambdaConstruct : Construct
     {
         var role = CreateLambdaRole(dataLake, glueCatalog, dynamo);
         var function = CreateLambdaFunction(role, dataLake, dynamo);
+        CreateErrorRateAlarm(function);
         var api = CreateHttpApi(function, cognito);
 
         _ = new CfnOutput(this, "SearchApiUrl", new CfnOutputProps
@@ -136,6 +138,13 @@ public sealed class LambdaConstruct : Construct
     {
         var athenaOutputLocation = $"s3://{dataLake.AthenaResults.BucketName}/results/";
 
+        var logGroup = new LogGroup(this, "lambda-logs", new LogGroupProps
+        {
+            LogGroupName = "/aws/lambda/pokepad-search",
+            Retention = RetentionDays.ONE_MONTH,
+            RemovalPolicy = RemovalPolicy.DESTROY
+        });
+
         return new Function(this, "search-function", new FunctionProps
         {
             FunctionName = "pokepad-search",
@@ -169,6 +178,8 @@ public sealed class LambdaConstruct : Construct
             MemorySize = 512,
             Timeout = Duration.Seconds(30),
             Architecture = Architecture.X86_64,
+            LogGroup = logGroup,
+            Tracing = Tracing.ACTIVE,
             Environment = new Dictionary<string, string>
             {
                 { "ASPNETCORE_ENVIRONMENT", "Production" },
@@ -177,6 +188,34 @@ public sealed class LambdaConstruct : Construct
                 { "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "1" },
                 { "DYNAMODB_TABLE_NAME", dynamo.Table.TableName }
             }
+        });
+    }
+
+    private void CreateErrorRateAlarm(Function function)
+    {
+        var period = Duration.Minutes(5);
+
+        var errorRate = new MathExpression(new MathExpressionProps
+        {
+            Expression = "IF(invocations > 0, 100 * errors / invocations, 0)",
+            UsingMetrics = new Dictionary<string, IMetric>
+            {
+                ["errors"] = function.MetricErrors(new MetricOptions { Period = period }),
+                ["invocations"] = function.MetricInvocations(new MetricOptions { Period = period })
+            },
+            Period = period,
+            Label = "Error Rate %"
+        });
+
+        _ = new Alarm(this, "error-rate-alarm", new AlarmProps
+        {
+            AlarmName = "pokepad-lambda-error-rate",
+            AlarmDescription = "Lambda error rate exceeded 5% over a 5-minute window",
+            Metric = errorRate,
+            Threshold = 5,
+            EvaluationPeriods = 1,
+            ComparisonOperator = ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+            TreatMissingData = TreatMissingData.NOT_BREACHING
         });
     }
 

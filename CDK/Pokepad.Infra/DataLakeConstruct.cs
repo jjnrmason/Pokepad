@@ -15,6 +15,17 @@ public sealed class DataLakeConstruct : Construct
         Silver = CreateMedallionBucket("silver", env, stack);
         Gold = CreateMedallionBucket("gold", env, stack);
         AthenaResults = CreateMedallionBucket("athena-results", env, stack, queryResultRetentionDays: 7);
+        
+        _ = new CfnOutput(this, "GoldBucketName", new CfnOutputProps
+        {
+            Value = Gold.BucketName,
+            Description = "Bucket name of the gold bucket"
+        });
+        _ = new CfnOutput(this, "AthenaBucketResultsName", new CfnOutputProps
+        {
+            Value = AthenaResults.BucketName,
+            Description = "Bucket name of the athena results bucket"
+        });
     }
 
     public Bucket Bronze { get; }
@@ -43,7 +54,7 @@ public sealed class DataLakeConstruct : Construct
             Encryption = BucketEncryption.S3_MANAGED,
             BlockPublicAccess = BlockPublicAccess.BLOCK_ALL,
             EnforceSSL = true,
-            RemovalPolicy = RemovalPolicy.RETAIN,
+            RemovalPolicy = RemovalPolicy.DESTROY,
             AutoDeleteObjects = false,
             LifecycleRules = lifecycleRules
         });
