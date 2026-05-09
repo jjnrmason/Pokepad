@@ -17,11 +17,12 @@ public sealed class LambdaConstruct : Construct
         string id,
         DataLakeConstruct dataLake,
         GlueCatalogConstruct glueCatalog,
-        CognitoConstruct cognito)
+        CognitoConstruct cognito,
+        DynamoConstruct dynamo)
         : base(scope, id)
     {
-        var role = CreateLambdaRole(dataLake, glueCatalog);
-        var function = CreateLambdaFunction(role, dataLake);
+        var role = CreateLambdaRole(dataLake, glueCatalog, dynamo);
+        var function = CreateLambdaFunction(role, dataLake, dynamo);
         var api = CreateHttpApi(function, cognito);
 
         _ = new CfnOutput(this, "SearchApiUrl", new CfnOutputProps
@@ -31,7 +32,7 @@ public sealed class LambdaConstruct : Construct
         });
     }
 
-    private Role CreateLambdaRole(DataLakeConstruct dataLake, GlueCatalogConstruct glueCatalog)
+    private Role CreateLambdaRole(DataLakeConstruct dataLake, GlueCatalogConstruct glueCatalog, DynamoConstruct dynamo)
     {
         var stack = Stack.Of(this);
 
@@ -107,6 +108,13 @@ public sealed class LambdaConstruct : Construct
             Resources = ["*"]
         }));
 
+        role.AddToPolicy(new PolicyStatement(new PolicyStatementProps
+        {
+            Effect = Effect.ALLOW,
+            Actions = ["dynamodb:PutItem", "dynamodb:GetItem"],
+            Resources = [dynamo.Table.TableArn]
+        }));
+
         var ssmParamArn = Arn.Format(new ArnComponents
         {
             Service = "ssm",
@@ -124,7 +132,7 @@ public sealed class LambdaConstruct : Construct
         return role;
     }
 
-    private Function CreateLambdaFunction(Role role, DataLakeConstruct dataLake)
+    private Function CreateLambdaFunction(Role role, DataLakeConstruct dataLake, DynamoConstruct dynamo)
     {
         var athenaOutputLocation = $"s3://{dataLake.AthenaResults.BucketName}/results/";
 
@@ -166,7 +174,8 @@ public sealed class LambdaConstruct : Construct
                 { "ASPNETCORE_ENVIRONMENT", "Production" },
                 { "ATHENA_OUTPUT_LOCATION", athenaOutputLocation },
                 { "ANTHROPIC_API_KEY_PARAM", "/pokepad/anthropic-api-key" },
-                { "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "1" }
+                { "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "1" },
+                { "DYNAMODB_TABLE_NAME", dynamo.Table.TableName }
             }
         });
     }
@@ -227,6 +236,30 @@ public sealed class LambdaConstruct : Construct
             Path = "/v1/health",
             Methods = [HttpMethod.GET],
             Integration = integration
+        });
+
+        api.AddRoutes(new AddRoutesOptions
+        {
+            Path = "/v1/query/start",
+            Methods = [HttpMethod.POST],
+            Integration = integration,
+            Authorizer = authorizer
+        });
+
+        api.AddRoutes(new AddRoutesOptions
+        {
+            Path = "/v1/query/{id}/status",
+            Methods = [HttpMethod.GET],
+            Integration = integration,
+            Authorizer = authorizer
+        });
+
+        api.AddRoutes(new AddRoutesOptions
+        {
+            Path = "/v1/query/{id}/results",
+            Methods = [HttpMethod.GET],
+            Integration = integration,
+            Authorizer = authorizer
         });
 
         return api;

@@ -11,33 +11,48 @@ public sealed class AthenaService(IAmazonAthena athena, IConfiguration config)
 
     public async Task<QueryResult> ExecuteAsync(string sql)
     {
-        var startResponse = await athena.StartQueryExecutionAsync(new StartQueryExecutionRequest
+        var executionId = await StartAsync(sql);
+        await WaitForCompletionAsync(executionId);
+        return await FetchResultsAsync(executionId);
+    }
+
+    public async Task<string> StartAsync(string sql)
+    {
+        var response = await athena.StartQueryExecutionAsync(new StartQueryExecutionRequest
         {
             QueryString = sql,
             WorkGroup = WorkGroup,
             QueryExecutionContext = new QueryExecutionContext { Database = "ecommerce_gold" },
             ResultConfiguration = new ResultConfiguration { OutputLocation = _outputLocation }
         });
+        return response.QueryExecutionId;
+    }
 
-        await WaitForCompletionAsync(startResponse.QueryExecutionId);
-        return await GetResultsAsync(startResponse.QueryExecutionId);
+    public async Task<QueryExecution> GetExecutionAsync(string executionId)
+    {
+        var response = await athena.GetQueryExecutionAsync(new GetQueryExecutionRequest
+        {
+            QueryExecutionId = executionId
+        });
+        return response.QueryExecution;
+    }
+
+    public async Task<QueryResult> FetchResultsAsync(string executionId)
+    {
+        return await GetResultsAsync(executionId);
     }
 
     private async Task WaitForCompletionAsync(string executionId)
     {
         while (true)
         {
-            var response = await athena.GetQueryExecutionAsync(new GetQueryExecutionRequest
-            {
-                QueryExecutionId = executionId
-            });
-
-            var state = response.QueryExecution.Status.State;
+            var execution = await GetExecutionAsync(executionId);
+            var state = execution.Status.State;
 
             if (state == QueryExecutionState.SUCCEEDED) return;
             if (state == QueryExecutionState.FAILED || state == QueryExecutionState.CANCELLED)
                 throw new InvalidOperationException(
-                    $"Query {state}: {response.QueryExecution.Status.StateChangeReason}");
+                    $"Query {state}: {execution.Status.StateChangeReason}");
 
             await Task.Delay(500);
         }

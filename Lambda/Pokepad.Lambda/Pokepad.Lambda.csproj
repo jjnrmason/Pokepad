@@ -13,6 +13,7 @@
       <PackageReference Include="AWSSDK.Athena" Version="4.0.4.14" />
       <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.3.37" />
       <PackageReference Include="AWSSDK.Glue" Version="4.0.29" />
+      <PackageReference Include="AWSSDK.DynamoDBv2" Version="4.0.*" />
       <PackageReference Include="AWSSDK.SimpleSystemsManagement" Version="4.0.*" />
     </ItemGroup>
 
