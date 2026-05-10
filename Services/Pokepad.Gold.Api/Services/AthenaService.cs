@@ -1,5 +1,6 @@
 using Amazon.Athena;
 using Amazon.Athena.Model;
+using Pokepad.Gold.Api.Models;
 
 namespace Pokepad.Gold.Api.Services;
 
@@ -96,5 +97,3 @@ public sealed class AthenaService(IAmazonAthena athena, IConfiguration config, I
         return new QueryResult(columns, rows);
     }
 }
-
-public record QueryResult(List<string> Columns, List<List<string?>> Rows);

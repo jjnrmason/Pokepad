@@ -109,6 +109,8 @@ builder.Services.AddOpenApi(options =>
 
 builder.Services.AddSingleton<GlueSchemaService>();
 builder.Services.AddSingleton<AthenaService>();
+builder.Services.AddSingleton<IChatService, OpenAiChatService>();
+builder.Services.AddSingleton<IModerationService, OpenAiModerationService>();
 builder.Services.AddSingleton<OpenAiService>();
 builder.Services.AddSingleton<SqlValidator>();
 builder.Services.AddSingleton<QueryTrackingService>();

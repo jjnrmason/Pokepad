@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Amazon.Athena;
 using Pokepad.Gold.Api.Middleware;
 using Pokepad.Gold.Api.Models;
@@ -71,7 +70,9 @@ public static class QueryEndpoints
 
             var execution = await athena.GetExecutionAsync(id);
             if (execution.Status.State != QueryExecutionState.SUCCEEDED)
+            {
                 return Results.Conflict(new { executionId = id, status = execution.Status.State.Value });
+            }
 
             var results = await athena.FetchResultsAsync(id);
             return Results.Ok(new SearchResponse(execution.Query, results.Columns, results.Rows));
@@ -84,23 +85,7 @@ public static class QueryEndpoints
             .RequireAuthorization();
     }
 
-    // API Gateway validates the JWT before forwarding to Lambda, so decoding without
-    // re-validating the signature here is safe and avoids an outbound JWKS fetch on cold start.
-    private static string GetUserId(HttpContext ctx)
-    {
-        var auth = ctx.Request.Headers.Authorization.ToString();
-        if (!auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-            return Results.Unauthorized().ToString()!; // unreachable past the authorizer
-
-        var parts = auth[7..].Split('.');
-        if (parts.Length < 2) throw new InvalidOperationException("Malformed JWT");
-
-        var payload = parts[1].Replace('-', '+').Replace('_', '/');
-        payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
-
-        using var doc = JsonDocument.Parse(Convert.FromBase64String(payload));
-        return doc.RootElement.TryGetProperty("sub", out var sub)
-            ? sub.GetString() ?? throw new InvalidOperationException("Empty sub claim")
-            : throw new InvalidOperationException("No sub claim in JWT");
-    }
+    private static string GetUserId(HttpContext ctx) =>
+        ctx.User.FindFirst("sub")?.Value
+            ?? throw new InvalidOperationException("No sub claim in JWT");
 }

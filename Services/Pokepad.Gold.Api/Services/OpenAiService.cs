@@ -1,19 +1,17 @@
-using OpenAI;
-using OpenAI.Chat;
 using Pokepad.Gold.Api.Exceptions;
 
 namespace Pokepad.Gold.Api.Services;
 
-public sealed class OpenAiService(OpenAIClient client, ILogger<OpenAiService> logger)
+public sealed class OpenAiService(IChatService chatService, IModerationService moderationService, ILogger<OpenAiService> logger)
 {
-    private const string ChatModel = "gpt-4o";
-    private const string ModerationModel = "omni-moderation-latest";
-
     public async Task<string> GenerateSqlAsync(string question, string schema)
     {
         logger.LogInformation("Generating SQL for question: {Question}", question);
 
-        await ModerateAsync(question);
+        if (await moderationService.IsFlaggedAsync(question))
+        {
+            throw new InputValidationException("Input was flagged by content moderation.");
+        }
 
         var systemText = $"""
             You are a SQL expert working with an AWS Athena database.
@@ -29,41 +27,22 @@ public sealed class OpenAiService(OpenAIClient client, ILogger<OpenAiService> lo
             {schema}
             """;
 
-        var chatClient = client.GetChatClient(ChatModel);
+        var userText = $"""
+            Write a single valid Athena SQL SELECT statement to answer this question:
+            {question}
 
-        var response = await chatClient.CompleteChatAsync(
-            [
-                ChatMessage.CreateSystemMessage(systemText),
-                ChatMessage.CreateUserMessage($"""
-                    Write a single valid Athena SQL SELECT statement to answer this question:
-                    {question}
+            Return ONLY the SQL statement — no explanation, no markdown, no semicolon.
+            """;
 
-                    Return ONLY the SQL statement — no explanation, no markdown, no semicolon.
-                    """)
-            ],
-            new ChatCompletionOptions { MaxOutputTokenCount = 1024 }
-        );
-
-        var sql = response.Value.Content[0].Text.Trim();
+        var sql = await chatService.CompleteChatAsync(systemText, userText);
 
         if (sql.Equals("INVALID_QUERY", StringComparison.OrdinalIgnoreCase))
+        {
             throw new InputValidationException("Question is not related to e-commerce data.");
+        }
 
-        logger.LogInformation("Generated SQL ({InputTokens} in / {OutputTokens} out): {Sql}",
-            response.Value.Usage.InputTokenCount, response.Value.Usage.OutputTokenCount, sql);
+        logger.LogInformation("Generated SQL: {Sql}", sql);
 
         return sql;
-    }
-
-    private async Task ModerateAsync(string input)
-    {
-        var moderationClient = client.GetModerationClient(ModerationModel);
-        var result = await moderationClient.ClassifyTextAsync(input);
-
-        if (result.Value.Flagged)
-        {
-            logger.LogWarning("Moderation flagged input: {Input}", input);
-            throw new InputValidationException("Input was flagged by content moderation.");
-        }
     }
 }

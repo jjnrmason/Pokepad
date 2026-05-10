@@ -13,8 +13,13 @@
     <File Path=".gitignore" />
     <File Path="README.md" />
   </Folder>
-  <Folder Name="/Services/">
+  <Folder Name="/Services/" />
+  <Folder Name="/Services/Pokepad.EmbeddingIndexer/">
+    <Project Path="Services/Pokepad.EmbeddingIndexer.Tests/Pokepad.EmbeddingIndexer.Tests.csproj" />
     <Project Path="Services/Pokepad.EmbeddingIndexer/Pokepad.EmbeddingIndexer.csproj" />
+  </Folder>
+  <Folder Name="/Services/Pokepad.Gold.Api/">
+    <Project Path="Services/Pokepad.Gold.Api.Tests/Pokepad.Gold.Api.Tests.csproj" />
     <Project Path="Services\Pokepad.Gold.Api\Pokepad.Gold.Api.csproj" />
   </Folder>
   <Folder Name="/Shared Libraries/">
