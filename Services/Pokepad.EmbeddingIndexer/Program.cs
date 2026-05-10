@@ -10,6 +10,8 @@ using Amazon.SQS.Model;
 using Npgsql;
 using OpenAI.Embeddings;
 using Parquet.Serialization;
+using Pokepad.EmbeddingIndexer.Models;
+using Pokepad.EmbeddingIndexer.Services;
 
 var sqsQueueUrl = GetEnv("SQS_QUEUE_URL");
 var aiKeyParam = GetEnv("AI_API_KEY_PARAM");
@@ -45,6 +47,8 @@ var embeddingClient = new EmbeddingClient("text-embedding-3-small", apiKey);
 
 await using var conn = new NpgsqlConnection(connectionString);
 await conn.OpenAsync();
+
+IProductEmbeddingRepository repository = new ProductEmbeddingRepository(conn);
 
 // Honour SIGTERM from ECS scale-in
 using var cts = new CancellationTokenSource();
@@ -97,19 +101,13 @@ Console.WriteLine("Worker exiting.");
 
 async Task ProcessMessageAsync(string body)
 {
-    // EventBridge sends $.detail which contains the S3 event: bucket.name + object.key
-    using var doc = JsonDocument.Parse(body);
-    var root = doc.RootElement;
-
-    var bucket = root.GetProperty("bucket").GetProperty("name").GetString()!;
-    var key = root.GetProperty("object").GetProperty("key").GetString()!;
-
-    Console.WriteLine($"Processing s3://{bucket}/{key}");
+    var s3Event = SqsEventParser.Parse(body);
+    Console.WriteLine($"Processing s3://{s3Event.Bucket}/{s3Event.Key}");
 
     using var getResponse = await s3.GetObjectAsync(new GetObjectRequest
     {
-        BucketName = bucket,
-        Key = key
+        BucketName = s3Event.Bucket,
+        Key = s3Event.Key
     });
 
     using var ms = new MemoryStream();
@@ -119,36 +117,21 @@ async Task ProcessMessageAsync(string body)
     var products = await ParquetSerializer.DeserializeAsync<ProductRecord>(ms);
     var productList = products.ToList();
 
-    Console.WriteLine($"Loaded {productList.Count} products from {key}");
+    Console.WriteLine($"Loaded {productList.Count} products from {s3Event.Key}");
 
     const int batchSize = 25;
 
     for (var i = 0; i < productList.Count; i += batchSize)
     {
         var batch = productList.GetRange(i, Math.Min(batchSize, productList.Count - i));
-        var texts = batch.Select(p => $"{p.Name} {p.Description} {p.Category} price:{p.Price:F2}").ToList();
+        var texts = batch.Select(ProductTextFormatter.Format).ToList();
 
         var result = await embeddingClient.GenerateEmbeddingsAsync(texts);
 
         for (var j = 0; j < batch.Count; j++)
         {
-            var product = batch[j];
             var floats = result.Value[j].ToFloats().ToArray();
-            var vectorStr = $"[{string.Join(",", floats)}]";
-            var metadata = JsonSerializer.Serialize(new { product.Name, product.Category, product.Price });
-
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = """
-                INSERT INTO products_embeddings (product_id, embedding, metadata)
-                VALUES (@productId, @embedding::vector, @metadata::jsonb)
-                ON CONFLICT (product_id) DO UPDATE
-                SET embedding = EXCLUDED.embedding,
-                    metadata  = EXCLUDED.metadata
-                """;
-            cmd.Parameters.AddWithValue("productId", product.ProductId);
-            cmd.Parameters.AddWithValue("embedding", vectorStr);
-            cmd.Parameters.AddWithValue("metadata", metadata);
-            await cmd.ExecuteNonQueryAsync();
+            await repository.UpsertAsync(batch[j], floats);
         }
 
         Console.WriteLine($"Upserted batch {i / batchSize + 1}: products {i + 1}–{i + batch.Count}");
@@ -158,12 +141,3 @@ async Task ProcessMessageAsync(string body)
 static string GetEnv(string name) =>
     Environment.GetEnvironmentVariable(name)
     ?? throw new InvalidOperationException($"Environment variable '{name}' is not set.");
-
-internal sealed class ProductRecord
-{
-    public string ProductId { get; set; } = "";
-    public string Name { get; set; } = "";
-    public string Category { get; set; } = "";
-    public string Description { get; set; } = "";
-    public double Price { get; set; }
-}
