@@ -6,6 +6,7 @@
   </Folder>
   <Folder Name="/Data Generation/">
     <Project Path="Data Generation/Pokepad.DataGeneration/Pokepad.DataGeneration.csproj" />
+    <Project Path="Data Generation/Pokepad.DataGeneration.Tests/Pokepad.DataGeneration.Tests.csproj" />
   </Folder>
   <Folder Name="/Project Files/">
     <File Path=".claude\settings.json" />

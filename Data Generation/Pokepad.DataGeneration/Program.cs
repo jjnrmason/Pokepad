@@ -1,3 +1,5 @@
+using Amazon.S3;
+using Amazon.S3.Transfer;
 using System.CommandLine;
 using Parquet.Serialization;
 using Pokepad.DataGeneration.Generators;
@@ -77,7 +79,10 @@ async Task GenerateData(string? bucketName, int customerCount, int productCount,
     {
         Console.WriteLine();
         Console.WriteLine($"Uploading to S3 bucket: {bucketName}...");
-        await S3Uploader.UploadAsync(bucketName, outputDirectory);
+        using var s3Client = new AmazonS3Client();
+        using var transferUtility = new TransferUtility(s3Client);
+        var uploader = new S3Uploader(transferUtility, new FileSystem());
+        await uploader.UploadAsync(bucketName, outputDirectory);
         Console.WriteLine("Upload complete.");
     }
     else

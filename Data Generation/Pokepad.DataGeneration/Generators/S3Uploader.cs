@@ -1,27 +1,32 @@
-using Amazon.S3;
 using Amazon.S3.Transfer;
 
 namespace Pokepad.DataGeneration.Generators;
 
-public static class S3Uploader
+public class S3Uploader
 {
-    public static async Task UploadAsync(string bucketName, string outputDirectory)
-    {
-        using var s3Client = new AmazonS3Client();
-        using var transferUtility = new TransferUtility(s3Client);
+    private readonly ITransferUtility _transferUtility;
+    private readonly IFileSystem _fileSystem;
 
-        foreach (var directory in Directory.GetDirectories(outputDirectory))
+    public S3Uploader(ITransferUtility transferUtility, IFileSystem fileSystem)
+    {
+        _transferUtility = transferUtility;
+        _fileSystem = fileSystem;
+    }
+
+    public async Task UploadAsync(string bucketName, string outputDirectory)
+    {
+        foreach (var directory in _fileSystem.GetDirectories(outputDirectory))
         {
             var entityName = Path.GetFileName(directory);
             var csvPath = Path.Combine(directory, $"{entityName}.parquet");
 
-            if (!File.Exists(csvPath))
+            if (!_fileSystem.FileExists(csvPath))
             {
                 continue;
             }
 
             var s3Key = $"gold/{entityName}/{entityName}.parquet";
-            await transferUtility.UploadAsync(csvPath, bucketName, s3Key);
+            await _transferUtility.UploadAsync(csvPath, bucketName, s3Key);
             Console.WriteLine($"  Uploaded: s3://{bucketName}/{s3Key}");
         }
     }
