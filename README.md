@@ -99,6 +99,49 @@ The `Pokepad.EmbeddingIndexer` ECS Fargate service keeps the vector store in syn
 
 **To trigger a full re-index**, re-upload the products Parquet files to S3. The data generation project does this automatically when given `--gold-bucket-name`.
 
+## Connecting to the database locally
+
+The stack provisions a `t4g.nano` bastion EC2 in the VPC accessible via SSM Session Manager — no inbound ports, no SSH keys, no key pair.
+
+**One-time: install the Session Manager plugin**
+
+```bash
+brew install --cask session-manager-plugin
+```
+
+**Open a tunnel**
+
+```bash
+# 1. Get the bastion instance ID and RDS hostname from CDK outputs
+aws cloudformation describe-stacks \
+  --stack-name BuilderStack \
+  --query 'Stacks[0].Outputs'
+
+# 2. Open the tunnel (keep this terminal running)
+aws ssm start-session \
+  --target <BastionInstanceId> \
+  --document-name AWS-StartPortForwardingSessionToRemoteHost \
+  --parameters '{"host":["<RdsEndpoint>"],"portNumber":["5432"],"localPortNumber":["5433"]}'
+```
+
+**Connect with DataGrip / psql**
+
+Point your client at `localhost:5433`. Fetch credentials from Secrets Manager:
+
+```bash
+aws secretsmanager get-secret-value \
+  --secret-id pokepad/vector-db-credentials \
+  --query SecretString --output text | jq '{user:.username, pass:.password}'
+```
+
+| Field    | Value                      |
+|----------|----------------------------|
+| Host     | `localhost`                |
+| Port     | `5433`                     |
+| Database | `pokepad`                  |
+| User     | `pokepad`                  |
+| Password | from Secrets Manager above |
+
 ## Authentication
 
 All endpoints except `GET /v1/health` require a Cognito JWT in the `Authorization: Bearer <token>` header.
@@ -155,8 +198,11 @@ curl -X POST https://<api-id>.execute-api.<region>.amazonaws.com/v1/search \
 | Service | Cost driver | Estimate |
 |---------|-------------|----------|
 | **RDS PostgreSQL** (db.t3.micro) | $0.017/hour × 730 hours | ~$12/month |
-| **NAT Gateway** | $0.045/hour + $0.045/GB data | ~$33/month + data transfer |
+| **NAT instance** (t4g.nano) | $0.0042/hour × 730 hours — replaces NAT Gateway | ~$3/month |
+| **Bastion** (t4g.nano) | $0.0042/hour × 730 hours — SSM access to RDS | ~$3/month |
 | **ECS Fargate** | Only billed when embedding tasks run. 0.25 vCPU + 0.5 GB | ~$0.012/hour per worker; scale-to-zero when queue is empty |
 | **SQS** | First 1 M requests/month free | $0 at low volume |
 
-The RDS instance and NAT Gateway are the dominant fixed costs. If you only need SQL search and want to minimise costs, the vector store infrastructure can be removed from the stack.
+**Total fixed: ~$18/month** — down from ~$87/month with a NAT Gateway and interface VPC endpoints.
+
+If you only need SQL search and want to cut costs further, the vector store infrastructure (RDS, NAT instance, bastion) can be removed from the stack entirely.

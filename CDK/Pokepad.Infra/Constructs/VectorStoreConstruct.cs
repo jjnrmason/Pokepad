@@ -25,6 +25,7 @@ public sealed class VectorStoreConstruct : Construct
         DbSecret = instance.Secret!;
         ConnectionStringParameter = CreateConnectionStringParameter(instance);
         InitializeDatabase(instance, Vpc, LambdaSecurityGroup);
+        CreateBastion(Vpc, rdsSecurityGroup, instance);
     }
 
     private Vpc CreateVpc()
@@ -33,6 +34,11 @@ public sealed class VectorStoreConstruct : Construct
         {
             VpcName = "pokepad-vpc",
             MaxAzs = 2,
+            NatGatewayProvider = NatProvider.InstanceV2(new NatInstanceProps
+            {
+                InstanceType = new Amazon.CDK.AWS.EC2.InstanceType("t4g.nano")
+            }),
+            NatGateways = 1,
             SubnetConfiguration =
             [
                 new SubnetConfiguration
@@ -53,30 +59,13 @@ public sealed class VectorStoreConstruct : Construct
                     SubnetType = SubnetType.PRIVATE_ISOLATED,
                     CidrMask = 28
                 }
-            ],
-            NatGateways = 1
+            ]
         });
 
-        // Free gateway endpoint — routes S3 traffic through the AWS backbone instead of NAT
+        // Free gateway endpoint — S3 traffic stays on the AWS backbone, bypasses the NAT instance
         vpc.AddGatewayEndpoint("s3-endpoint", new GatewayVpcEndpointOptions
         {
             Service = GatewayVpcEndpointAwsService.S3
-        });
-
-        // Interface endpoints avoid NAT costs for SSM and Secrets Manager calls
-        vpc.AddInterfaceEndpoint("sm-endpoint", new InterfaceVpcEndpointOptions
-        {
-            Service = InterfaceVpcEndpointAwsService.SECRETS_MANAGER
-        });
-
-        vpc.AddInterfaceEndpoint("ssm-endpoint", new InterfaceVpcEndpointOptions
-        {
-            Service = InterfaceVpcEndpointAwsService.SSM
-        });
-
-        vpc.AddInterfaceEndpoint("logs-endpoint", new InterfaceVpcEndpointOptions
-        {
-            Service = InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS
         });
 
         return vpc;
@@ -143,6 +132,57 @@ public sealed class VectorStoreConstruct : Construct
             ParameterName = "/pokepad/vector-db-connection-string",
             StringValue = $"Host={instance.DbInstanceEndpointAddress};Port={instance.DbInstanceEndpointPort};Database=pokepad;Username=pokepad",
             Description = "Pokepad vector store connection string with password in Secrets Manager at pokepad/vector-db-credentials"
+        });
+    }
+
+    private void CreateBastion(Vpc vpc, SecurityGroup rdsSg, DatabaseInstance instance)
+    {
+        var bastionSg = new SecurityGroup(this, "bastion-sg", new SecurityGroupProps
+        {
+            SecurityGroupName = "pokepad-bastion-sg",
+            Vpc = vpc,
+            Description = "Security group for RDS bastion no inbound, outbound PostgreSQL to RDS only",
+            AllowAllOutbound = false
+        });
+
+        bastionSg.AddEgressRule(Peer.AnyIpv4(), Port.Tcp(443), "Allow outbound HTTPS for SSM agent");
+        bastionSg.AddEgressRule(rdsSg, Port.Tcp(5432), "Allow outbound PostgreSQL to RDS");
+        rdsSg.AddIngressRule(bastionSg, Port.Tcp(5432), "Allow inbound PostgreSQL from bastion");
+
+        var bastionRole = new Role(this, "bastion-role", new RoleProps
+        {
+            AssumedBy = new ServicePrincipal("ec2.amazonaws.com"),
+            ManagedPolicies =
+            [
+                ManagedPolicy.FromAwsManagedPolicyName("AmazonSSMManagedInstanceCore")
+            ]
+        });
+
+        var bastion = new Instance_(this, "bastion", new Amazon.CDK.AWS.EC2.InstanceProps
+        {
+            InstanceName = "pokepad-bastion",
+            InstanceType = new Amazon.CDK.AWS.EC2.InstanceType("t4g.nano"),
+            MachineImage = MachineImage.LatestAmazonLinux2023(new AmazonLinux2023ImageSsmParameterProps
+            {
+                CpuType = AmazonLinuxCpuType.ARM_64
+            }),
+            Vpc = vpc,
+            VpcSubnets = new SubnetSelection { SubnetType = SubnetType.PRIVATE_WITH_EGRESS },
+            SecurityGroup = bastionSg,
+            Role = bastionRole,
+            // No key pair — access is via SSM only
+        });
+
+        _ = new CfnOutput(this, "BastionInstanceId", new CfnOutputProps
+        {
+            Value = bastion.InstanceId,
+            Description = "Bastion instance ID use with SSM port forwarding to reach RDS"
+        });
+
+        _ = new CfnOutput(this, "RdsEndpoint", new CfnOutputProps
+        {
+            Value = instance.DbInstanceEndpointAddress,
+            Description = "RDS endpoint hostname"
         });
     }
 
