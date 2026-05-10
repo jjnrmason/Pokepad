@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Pokepad.EmbeddingIndexer</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.S3" Version="4.0.*" />
+    <PackageReference Include="AWSSDK.SQS" Version="4.0.*" />
+    <PackageReference Include="AWSSDK.SecretsManager" Version="4.0.*" />
+    <PackageReference Include="AWSSDK.SimpleSystemsManagement" Version="4.0.*" />
+    <PackageReference Include="Npgsql" Version="9.0.*" />
+    <PackageReference Include="OpenAI" Version="2.10.0" />
+    <PackageReference Include="Parquet.Net" Version="4.24.*" />
+  </ItemGroup>
+</Project>

@@ -7,17 +7,16 @@
   <Folder Name="/Data Generation/">
     <Project Path="Data Generation/Pokepad.DataGeneration/Pokepad.DataGeneration.csproj" />
   </Folder>
-  <Folder Name="/Lambda/">
-    <File Path="Lambda\README.md" />
-    <Project Path="Lambda/Pokepad.Lambda/Pokepad.Lambda.csproj" />
-  </Folder>
   <Folder Name="/Project Files/">
     <File Path=".claude\settings.json" />
     <File Path=".gitignore" />
     <File Path="README.md" />
   </Folder>
+  <Folder Name="/Services/">
+    <Project Path="Services/Pokepad.EmbeddingIndexer/Pokepad.EmbeddingIndexer.csproj" />
+    <Project Path="Services\Pokepad.Gold.Api\Pokepad.Gold.Api.csproj" />
+  </Folder>
   <Folder Name="/Shared Libraries/">
-    <Project Path="Shared Libraries/Pokepad.Data/Pokepad.Data.csproj" />
     <Project Path="Shared Libraries/Pokepad.Models/Pokepad.Models.csproj" />
   </Folder>
 </Solution>

@@ -1,6 +1,7 @@
 using Amazon.CDK;
 using Amazon.CDK.Assertions;
 using NUnit.Framework;
+using Pokepad.Infra.Constructs;
 
 namespace Pokepad.Infra.Tests.IamStack.WhenWorkingWithTheIamStack;
 

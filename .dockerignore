@@ -1,0 +1,8 @@
+**/.DS_Store
+**/.git
+**/.idea
+**/.claude
+**/bin
+**/obj
+CDK/cdk.out
+Data Generation

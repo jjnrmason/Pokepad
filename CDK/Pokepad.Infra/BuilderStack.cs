@@ -1,5 +1,6 @@
 using Amazon.CDK;
 using Constructs;
+using Pokepad.Infra.Constructs;
 
 namespace Pokepad.Infra;
 
@@ -15,5 +16,6 @@ public sealed class BuilderStack : Stack
         _ = new AthenaConstruct(this, "Athena", dataLake.AthenaResults);
         _ = new IamConstruct(this, "Iam", dataLake, glueCatalog);
         _ = new LambdaConstruct(this, "Lambda", dataLake, glueCatalog, cognito, dynamo, vectorStore);
+        _ = new EcsConstruct(this, "Ecs", dataLake, vectorStore);
     }
 }

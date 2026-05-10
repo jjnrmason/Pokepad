@@ -20,8 +20,8 @@ def _init_database(props):
     conn.run(
         """
         CREATE TABLE IF NOT EXISTS products_embeddings (
-            id        BIGSERIAL PRIMARY KEY,
-            product_id TEXT      NOT NULL,
+            id         BIGSERIAL PRIMARY KEY,
+            product_id TEXT      NOT NULL UNIQUE,
             embedding  vector(1536),
             metadata   JSONB
         )
