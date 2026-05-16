@@ -1,4 +1,6 @@
 using Pokepad.Gold.Api.Exceptions;
+using Pokepad.Gold.Api.Models;
+using System.Text.Json;
 
 namespace Pokepad.Gold.Api.Services;
 
@@ -44,5 +46,30 @@ public sealed class OpenAiService(IChatService chatService, IModerationService m
         logger.LogInformation("Generated SQL: {Sql}", sql);
 
         return sql;
+    }
+
+    public async Task<string> GenerateSemanticAnswerAsync(string question, IReadOnlyList<SemanticSearchResult> results)
+    {
+        var systemText = """
+            You answer product search questions using only the semantic search results provided.
+            Keep the answer concise and practical.
+            If the results do not contain enough information, say so.
+            """;
+
+        var userText = $"""
+            Question:
+            {question}
+
+            Semantic search results:
+            {JsonSerializer.Serialize(results)}
+
+            Return a plain-English answer only.
+            """;
+
+        var answer = await chatService.CompleteChatAsync(systemText, userText);
+
+        logger.LogInformation("Generated semantic search answer");
+
+        return answer;
     }
 }

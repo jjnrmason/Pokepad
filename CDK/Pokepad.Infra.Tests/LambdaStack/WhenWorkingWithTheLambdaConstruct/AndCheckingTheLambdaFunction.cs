@@ -72,6 +72,12 @@ public partial class WhenWorkingWithTheLambdaConstruct
         }
 
         [Test]
+        public void ThenTheRoleHasVectorDbSecretAccess()
+        {
+            Assert.That(this.AnyPolicyStatementContainsAction("secretsmanager:GetSecretValue"), Is.True);
+        }
+
+        [Test]
         public void ThenTheErrorRateAlarmIsCreated()
         {
             var alarms = this.Template.FindResources("AWS::CloudWatch::Alarm");

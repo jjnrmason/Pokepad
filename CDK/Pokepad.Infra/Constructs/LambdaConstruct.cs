@@ -147,6 +147,13 @@ public sealed class LambdaConstruct : Construct
             Resources = [vectorDbParamArn]
         }));
 
+        role.AddToPolicy(new PolicyStatement(new PolicyStatementProps
+        {
+            Effect = Effect.ALLOW,
+            Actions = ["secretsmanager:GetSecretValue"],
+            Resources = [vectorStore.DbSecret.SecretArn]
+        }));
+
         return role;
     }
 
@@ -205,7 +212,8 @@ public sealed class LambdaConstruct : Construct
                 { "AI_API_KEY_PARAM", "/pokepad/ai-api-key" },
                 { "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "1" },
                 { "DYNAMODB_TABLE_NAME", dynamo.Table.TableName },
-                { "VECTOR_DB_CONNECTION_STRING_PARAM", "/pokepad/vector-db-connection-string" }
+                { "VECTOR_DB_CONNECTION_STRING_PARAM", "/pokepad/vector-db-connection-string" },
+                { "VECTOR_DB_SECRET_ARN", vectorStore.DbSecret.SecretArn }
             }
         });
     }
@@ -283,6 +291,14 @@ public sealed class LambdaConstruct : Construct
         api.AddRoutes(new AddRoutesOptions
         {
             Path = "/v1/search",
+            Methods = [HttpMethod.POST],
+            Integration = integration,
+            Authorizer = authorizer
+        });
+
+        api.AddRoutes(new AddRoutesOptions
+        {
+            Path = "/v1/semantic-search",
             Methods = [HttpMethod.POST],
             Integration = integration,
             Authorizer = authorizer

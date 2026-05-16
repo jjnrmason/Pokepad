@@ -174,6 +174,32 @@ curl -X POST https://<api-id>.execute-api.<region>.amazonaws.com/v1/search \
   -d '{"question": "Which product categories generated the most revenue last month?"}'
 ```
 
+**Semantic search request**
+
+```bash
+curl -X POST https://<api-id>.execute-api.<region>.amazonaws.com/v1/semantic-search \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Show me waterproof hiking boots under £100", "topK": 10, "synthesise": false}'
+```
+
+The response returns the nearest product matches from pgvector:
+
+```json
+{
+  "results": [
+    {
+      "productId": "product-123",
+      "metadata": "{\"Name\":\"Trail Boot\",\"Category\":\"Footwear\",\"Price\":89.99}",
+      "similarityScore": 0.92
+    }
+  ],
+  "answer": null
+}
+```
+
+Set `"synthesise": true` to include a concise plain-English answer generated from the top-K matches.
+
 ## Service costs to run
 
 **Per-request costs** (SQL search, typical low-to-medium volume):

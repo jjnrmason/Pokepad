@@ -41,6 +41,18 @@ public partial class WhenWorkingWithTheLambdaConstruct
         }
 
         [Test]
+        public void ThenTheSemanticSearchRouteExists()
+        {
+            var routes = this.Template.FindResources("AWS::ApiGatewayV2::Route");
+            var hasSearchRoute = routes.Values.Any(r =>
+            {
+                var props = (IDictionary<string, object>)r["Properties"];
+                return props["RouteKey"]?.ToString() == "POST /v1/semantic-search";
+            });
+            Assert.That(hasSearchRoute, Is.True);
+        }
+
+        [Test]
         public void ThenTheHealthRouteExists()
         {
             var routes = this.Template.FindResources("AWS::ApiGatewayV2::Route");
@@ -96,6 +108,19 @@ public partial class WhenWorkingWithTheLambdaConstruct
             {
                 var props = (IDictionary<string, object>)r["Properties"];
                 return props["RouteKey"]?.ToString() == "POST /v1/search";
+            });
+            var routeProps = (IDictionary<string, object>)searchRoute["Properties"];
+            Assert.That(routeProps.ContainsKey("AuthorizerId"), Is.True);
+        }
+
+        [Test]
+        public void ThenTheCognitoAuthorizerIsAttachedToTheSemanticSearchRoute()
+        {
+            var routes = this.Template.FindResources("AWS::ApiGatewayV2::Route");
+            var searchRoute = routes.Values.First(r =>
+            {
+                var props = (IDictionary<string, object>)r["Properties"];
+                return props["RouteKey"]?.ToString() == "POST /v1/semantic-search";
             });
             var routeProps = (IDictionary<string, object>)searchRoute["Properties"];
             Assert.That(routeProps.ContainsKey("AuthorizerId"), Is.True);

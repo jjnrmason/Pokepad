@@ -1,10 +1,14 @@
 using Microsoft.AspNetCore.Authentication;
 using Scalar.AspNetCore;
+using System.Text.Json;
 using Amazon.Athena;
 using Amazon.DynamoDBv2;
 using Amazon.Glue;
+using Amazon.SecretsManager;
+using Amazon.SecretsManager.Model;
 using Amazon.SimpleSystemsManagement;
 using Amazon.SimpleSystemsManagement.Model;
+using Npgsql;
 using OpenAI;
 using Pokepad.Gold.Api.Endpoints.V1;
 using Pokepad.Gold.Api.Exceptions;
@@ -20,21 +24,45 @@ builder.Services.AddAWSService<IAmazonDynamoDB>();
 
 if (!builder.Environment.IsDevelopment())
 {
-    var ssmParamName = Environment.GetEnvironmentVariable("API_KEY_PARAM")
-                       ?? throw new InvalidOperationException("API_KEY_PARAM is required");
+    var ssmParamName = Environment.GetEnvironmentVariable("AI_API_KEY_PARAM")
+                       ?? Environment.GetEnvironmentVariable("API_KEY_PARAM")
+                       ?? throw new InvalidOperationException("AI_API_KEY_PARAM is required");
+    var vectorDbConnectionStringParam = Environment.GetEnvironmentVariable("VECTOR_DB_CONNECTION_STRING_PARAM")
+                                        ?? throw new InvalidOperationException("VECTOR_DB_CONNECTION_STRING_PARAM is required");
+    var vectorDbSecretArn = Environment.GetEnvironmentVariable("VECTOR_DB_SECRET_ARN")
+                            ?? throw new InvalidOperationException("VECTOR_DB_SECRET_ARN is required");
 
     using var ssm = new AmazonSimpleSystemsManagementClient();
+    using var secretsManager = new AmazonSecretsManagerClient();
     var ssmResponse = await ssm.GetParameterAsync(new GetParameterRequest
     {
         Name = ssmParamName,
         WithDecryption = true
     });
+    var vectorDbResponse = await ssm.GetParameterAsync(new GetParameterRequest
+    {
+        Name = vectorDbConnectionStringParam,
+        WithDecryption = true
+    });
+    var vectorDbSecretResponse = await secretsManager.GetSecretValueAsync(new GetSecretValueRequest
+    {
+        SecretId = vectorDbSecretArn
+    });
+    using var vectorDbSecret = JsonDocument.Parse(vectorDbSecretResponse.SecretString);
+    var vectorDbPassword = vectorDbSecret.RootElement.GetProperty("password").GetString()
+                           ?? throw new InvalidOperationException("VECTOR_DB_SECRET_ARN did not contain a password");
+    var vectorDbConnectionString = $"{vectorDbResponse.Parameter.Value};Password={vectorDbPassword}";
 
     builder.Services.AddSingleton(_ => new OpenAIClient(ssmResponse.Parameter.Value));
+    builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(vectorDbConnectionString));
 } else 
 {
     builder.Services.AddSingleton(_ => new OpenAIClient(
         Environment.GetEnvironmentVariable("API_KEY") ?? throw new InvalidOperationException("API_KEY is required")
+    ));
+    builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(
+        Environment.GetEnvironmentVariable("VECTOR_DB_CONNECTION_STRING")
+        ?? throw new InvalidOperationException("VECTOR_DB_CONNECTION_STRING is required")
     ));
 }
 
@@ -110,8 +138,11 @@ builder.Services.AddOpenApi(options =>
 builder.Services.AddSingleton<GlueSchemaService>();
 builder.Services.AddSingleton<AthenaService>();
 builder.Services.AddSingleton<IChatService, OpenAiChatService>();
+builder.Services.AddSingleton<IEmbeddingService, OpenAiEmbeddingService>();
 builder.Services.AddSingleton<IModerationService, OpenAiModerationService>();
+builder.Services.AddSingleton<ISemanticSearchRepository, PgVectorSemanticSearchRepository>();
 builder.Services.AddSingleton<OpenAiService>();
+builder.Services.AddSingleton<SemanticSearchService>();
 builder.Services.AddSingleton<SqlValidator>();
 builder.Services.AddSingleton<QueryTrackingService>();
 builder.Services.AddAuthentication("ApiGateway")
@@ -142,6 +173,7 @@ var v1 = app.MapGroup("/v1");
 
 v1.MapHealthEndpoints();
 v1.MapSearchEndpoints();
+v1.MapSemanticSearchEndpoints();
 v1.MapQueryEndpoints();
 
 app.UseAuthentication();
