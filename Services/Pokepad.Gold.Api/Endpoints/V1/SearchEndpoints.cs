@@ -15,6 +15,11 @@ public static class SearchEndpoints
             AthenaService athena,
             SqlValidator validator) =>
         {
+            if (string.IsNullOrEmpty(request.Question))
+            {
+                return Results.BadRequest();
+            }
+            
             var schema = await glue.GetSchemaAsync();
             var sql = await openAi.GenerateSqlAsync(request.Question, schema);
 

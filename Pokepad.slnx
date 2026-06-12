@@ -19,6 +19,8 @@
     <Project Path="Services/Pokepad.EmbeddingIndexer/Pokepad.EmbeddingIndexer.csproj" />
   </Folder>
   <Folder Name="/Services/Pokepad.Gold.Api/">
+    <Project Path="Services/Pokepad.Gold.Api.IntegrationTests/Pokepad.Gold.Api.IntegrationTests.csproj" />
+    <Project Path="Services/Pokepad.Gold.Api.PerformanceTests/Pokepad.Gold.Api.PerformanceTests.csproj" />
     <Project Path="Services/Pokepad.Gold.Api.Tests/Pokepad.Gold.Api.Tests.csproj" />
     <Project Path="Services\Pokepad.Gold.Api\Pokepad.Gold.Api.csproj" />
   </Folder>
