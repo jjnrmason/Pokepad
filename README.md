@@ -152,15 +152,15 @@ The JWT is validated by API Gateway before the request ever reaches Lambda, so t
 
 ```bash
 aws cognito-idp admin-set-user-password \
-    --user-pool-id <PoolId>> \
+    --user-pool-id $PoolId \
     --username test@pokepad.dev \
     --password Pokepad1! \
     --permanent
     
 aws cognito-idp initiate-auth \
   --auth-flow USER_PASSWORD_AUTH \
-  --client-id <UserPoolClientId> \
-  --auth-parameters USERNAME=test@pokepad.dev,PASSWORD=<password>
+  --client-id $UserPoolClientId \
+  --auth-parameters USERNAME=test@pokepad.dev,PASSWORD=Pokepad1!
 ```
 
 The `IdToken` in the response is your Bearer token. It is valid for 1 hour.
@@ -199,6 +199,20 @@ The response returns the nearest product matches from pgvector:
 ```
 
 Set `"synthesise": true` to include a concise plain-English answer generated from the top-K matches.
+
+## Performance tests
+
+k6 performance tests live in `Services/Pokepad.Gold.Api.PerformanceTests`.
+
+```bash
+cd Services/Pokepad.Gold.Api.PerformanceTests
+
+BASE_URL=https://<api-id>.execute-api.<region>.amazonaws.com \
+TOKEN=<id-token> \
+./run-perf-tests.sh
+```
+
+The scripts cover baseline latency, the async query flow under load, API Gateway rate-limit probing, and a manual cold-start measurement.
 
 ## Service costs to run
 
