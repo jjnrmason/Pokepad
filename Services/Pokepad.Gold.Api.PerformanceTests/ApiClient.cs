@@ -1,10 +1,16 @@
-using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
 namespace Pokepad.Gold.Api.PerformanceTests;
 
+/// <summary>
+/// A thin HTTP wrapper around the deployed Pokepad API. Pacer measures latency, throughput, and
+/// status grouping itself, so this client just issues authenticated requests and surfaces the raw
+/// <see cref="HttpResponseMessage"/> for steps to map onto a <see cref="Pacer.Steps.StepResult"/>.
+/// A single instance is shared across virtual users — <see cref="HttpClient"/> is safe for
+/// concurrent requests.
+/// </summary>
 public sealed class ApiClient : IDisposable
 {
     public const string ProductQuestion = "Show me products in the electronics category";
@@ -23,60 +29,29 @@ public sealed class ApiClient : IDisposable
             new AuthenticationHeaderValue("Bearer", PerformanceTestEnvironment.UserToken);
     }
 
-    public Task<HttpResponseMessage> GetAsync(string path, string endpoint) =>
-        this.SendAsync(new HttpRequestMessage(HttpMethod.Get, path), endpoint);
+    public Task<HttpResponseMessage> GetAsync(string path, CancellationToken cancellationToken) =>
+        this._client.SendAsync(new HttpRequestMessage(HttpMethod.Get, path), cancellationToken);
 
-    public Task<HttpResponseMessage> PostAsync(string path, object body, string endpoint) =>
-        this.SendAsync(new HttpRequestMessage(HttpMethod.Post, path)
+    public Task<HttpResponseMessage> PostAsync(string path, object body, CancellationToken cancellationToken) =>
+        this._client.SendAsync(new HttpRequestMessage(HttpMethod.Post, path)
         {
             Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json")
-        }, endpoint);
+        }, cancellationToken);
 
-    public async Task<string> StartQueryAsync()
+    /// <summary>Reads the <c>status</c> field from a <c>v1/query/{id}/status</c> response body.</summary>
+    public static async Task<string?> ReadStatusAsync(HttpResponseMessage response)
     {
-        using var response = await this.PostAsync("v1/query/start", new { question = ProductQuestion }, "query_start");
-        response.EnsureSuccessStatusCode();
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return body.RootElement.GetProperty("status").GetString();
+    }
 
+    /// <summary>Reads the <c>executionId</c> field from a <c>v1/query/start</c> response body.</summary>
+    public static async Task<string> ReadExecutionIdAsync(HttpResponseMessage response)
+    {
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         return body.RootElement.GetProperty("executionId").GetString()
             ?? throw new InvalidOperationException("query/start did not return an executionId.");
     }
 
-    public async Task WaitForQueryAsync(string executionId, TimeSpan timeout)
-    {
-        var deadline = DateTime.UtcNow + timeout;
-
-        while (DateTime.UtcNow < deadline)
-        {
-            using var response = await this.GetAsync($"v1/query/{executionId}/status", "query_status");
-            response.EnsureSuccessStatusCode();
-
-            using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-            var status = body.RootElement.GetProperty("status").GetString();
-            if (status == "SUCCEEDED")
-            {
-                return;
-            }
-
-            if (status is "FAILED" or "CANCELLED")
-            {
-                throw new InvalidOperationException($"Query {executionId} finished with status {status}.");
-            }
-
-            await Task.Delay(TimeSpan.FromSeconds(1));
-        }
-
-        throw new TimeoutException($"Query {executionId} did not complete within {timeout.TotalSeconds:F0} s.");
-    }
-
     public void Dispose() => this._client.Dispose();
-
-    private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, string endpoint)
-    {
-        var startedAt = Stopwatch.GetTimestamp();
-        var response = await this._client.SendAsync(request);
-        PokepadApiMetrics.RecordRequest(endpoint, (int)response.StatusCode, Stopwatch.GetElapsedTime(startedAt));
-
-        return response;
-    }
 }

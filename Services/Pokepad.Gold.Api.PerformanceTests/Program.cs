@@ -1,16 +1,24 @@
-using BenchmarkDotNet.Running;
+using Microsoft.Extensions.DependencyInjection;
+using Pacer.Hosting;
+using Pokepad.Gold.Api.PerformanceTests;
 using Pokepad.Gold.Api.PerformanceTests.Scenarios;
 
-if (args.Length > 0 && args[0].Equals("rate-limit", StringComparison.OrdinalIgnoreCase))
+// A Pacer console app: register a shared API client plus the scenarios, then hand the command-line
+// arguments to Pacer. Try:
+//   dotnet run -- list
+//   dotnet run -- run --scenario search --out ./reports
+//   dotnet run -- run --group storefront --profile load --users 5 --duration 1
+//   dotnet run -- run --scenario rate-limit
+//   dotnet run -- run --scenario cold-start
+return await PacerApplication.RunAsync(args, builder =>
 {
-    await RateLimitProbe.RunAsync();
-    return;
-}
+    builder.Services.AddSingleton<ApiClient>();
 
-if (args.Length > 0 && args[0].Equals("cold-start", StringComparison.OrdinalIgnoreCase))
-{
-    await ColdStartProbe.RunAsync();
-    return;
-}
-
-BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
+    builder.Services.AddPacer()
+        .AddScenario(PokepadScenarios.Health())
+        .AddScenario(PokepadScenarios.Search())
+        .AddScenario(PokepadScenarios.SemanticSearch())
+        .AddScenario(PokepadScenarios.AsyncQueryFlow())
+        .AddScenario(PokepadScenarios.RateLimit())
+        .AddScenario(PokepadScenarios.ColdStart());
+});

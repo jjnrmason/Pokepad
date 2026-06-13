@@ -436,4 +436,4 @@ FodyWeavers.xsd
 *.msm
 *.msp
 Services/Pokepad.Gold.Api.PerformanceTests/appsettings.Development.json
-BenchmarkDotNet.Artifacts/
+Services/Pokepad.Gold.Api.PerformanceTests/reports/
